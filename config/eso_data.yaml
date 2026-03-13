@@ -1,0 +1,56 @@
+# ===============================
+# nnU-Net Task 基本信息
+# ===============================
+task:
+  task_id: 501
+  task_name: Task501_ESO_PreSeg
+  description: "Multi-center pre-therapy esophageal cancer segmentation"
+
+# ===============================
+# nnU-Net raw data 基础路径
+# ===============================
+nnunet:
+#  base: /mnt/data/zl/dataset/eso_seg_process
+  base: /home/fangzheng/zoule/ESO_nnUNet_dataset
+  raw_data_base: /home/fangzheng/zoule/ESO_nnUNet_dataset/nnUNet_raw_data  # 修改为你的 nnUNet_raw_data 根路径
+  preprocessing_output_dir: /home/fangzheng/zoule/ESO_nnUNet_dataset/nnUNet_preprocessed
+  network_training_output_dir_base: ./ckpt/
+
+# ===============================
+# 多中心原始数据路径
+# ===============================
+centers:
+#  - name: shiyan
+#    pre_path: /mnt/data/zl/dataset/ESO-SEG/shiyan/pre-therapy/images
+#    mask_path: /mnt/data/zl/dataset/ESO-SEG/shiyan/pre-therapy/masks
+#
+#  - name: xiangyang
+#    pre_path: /mnt/data/zl/dataset/ESO-SEG/xiangyang/pre-therapy/images
+#    mask_path: /mnt/data/zl/dataset/ESO-SEG/xiangyang/pre-therapy/masks
+
+  - name: tongji
+    pre_path: E:/ESO_SEG_TJ/train/images
+    mask_path: E:/ESO_SEG_TJ/train/masks
+
+test:
+  - name: TJ_test
+    image_path: E:/ESO_SEG_TJ/test/images
+
+
+# ===============================
+# nnU-Net dataset.json 配置
+# ===============================
+dataset_json:
+  modality:
+    "0": CT
+  labels:
+    "0": background
+    "1": EsophagealTumor
+
+# ===============================
+# 命名规则
+# ===============================
+naming:
+  prefix: ESO
+  start_index: 0
+  modality_suffix: "_0000"   # 单模态 CT

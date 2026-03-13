@@ -1,0 +1,94 @@
+dataset_name: LungTumor
+
+# raw data dir
+#
+#data:
+#  lungtumor20230504:
+#    pre_therapy_img: '/mnt/data1/zyzlung/Dataset/20230504_data/pre_therapy/image/'
+#    pre_therapy_mask: '/mnt/data1/zyzlung/Dataset/20230504_data/pre_therapy/mask/'
+#    post_therapy_img: '/mnt/data1/zyzlung/Dataset/20230504_data/post_therapy/image/'
+#    post_therapy_mask: '/mnt/data1/zyzlung/Dataset/20230504_data/post_therapy/mask/'
+#  lungtumor20230516:
+#    pre_therapy_img: '/mnt/data1/zyzlung/Dataset/20230516_data/pre_therapy/'
+#    pre_therapy_mask: '/mnt/data1/zyzlung/Dataset/20230516_gt_mask/pre_therapy/'
+#    post_therapy_img: '/mnt/data1/zyzlung/Dataset/20230516_data/post_therapy/'
+#    post_therapy_mask: '/mnt/data1/zyzlung/Dataset/20230516_gt_mask/post_therapy/'
+#  lungtumor20230530:
+#    pre_therapy_img: '/mnt/data1/zyzlung/Dataset/20230530_data/pre_therapy/'
+#    pre_therapy_mask: '/mnt/data1/zyzlung/Dataset/20230530_gt_mask/pre_therapy/'
+#    post_therapy_img: '/mnt/data1/zyzlung/Dataset/20230530_data/post_therapy/'
+#    post_therapy_mask: '/mnt/data1/zyzlung/Dataset/20230530_gt_mask/post_therapy/'
+#  lungtumor20230703:
+#    pre_therapy_img: '/mnt/data1/zyzlung/Dataset/20230703_data/pre_therapy/'
+#    pre_therapy_mask: '/mnt/data1/zyzlung/Dataset/20230703_gt_mask/pre_therapy/'
+#    post_therapy_img: '/mnt/data1/zyzlung/Dataset/20230703_data/post_therapy/'
+#    post_therapy_mask: '/mnt/data1/zyzlung/Dataset/20230703_gt_mask/post_therapy/'
+#
+##
+## all origin ct nii
+#origin_all_ct_nii_dir: '/mnt/data1/zyzlung/Experiment/prep_data/s0_origin_nii/'
+#
+## resample dir
+## median spacing x,y,z: 0.7265625, 0.7265625, 1.5
+#resample_spacing: [1.0, 1.0, 2.0]
+#resample_all_ct_nii_dir: '/mnt/data1/zyzlung/Experiment/prep_data/s1_resample_nii/'
+#
+## preprocessed data dir
+#all_ct_prep_data_dir: '/mnt/data1/zyzlung/Experiment/data/prep_data/'
+
+
+
+#
+## test id idx
+## 11 patients
+#test_id_pre_1_list: ['p4701494', 'p4947374', 'p4932477', 'p4844899', 'p4811372', 'p4906822', 'p5103715', 'p5175986', 'p5110873', 'p4830157', 'p5086169']
+#test_id_post_1_list: ['p4873917', 'p5004800', 'p5364284', 'p5288111', 'p5101600', 'p5103291', 'p5015807', 'p5003831', 'p5349322', 'p4904106', 'p5265049']
+#
+## 1 patient
+#test_id_pre_2_list: ['UCT202008261292']
+#test_id_post_2_list: ['UCT202011251558']
+#
+## 1 patient
+#test_id_pre_3_list: ['UCT202201112935']
+#test_id_post_3_list: ['UCT202206132953']
+#
+## 11 patients
+#test_id_pre_4_list: ['UCT202206073735', 'UCT202206291793', 'UCT202008311098', 'UCT201906201744', 'UCT202008271405', 'UCT201905213188', 'UCT202110142638', 'UCT201906151139', 'UCT201906260203', 'UCT202010162923', 'UCT202207012531']
+#test_id_post_4_list:  ['UCT202112260065', 'UCT202011241357', 'UCT202208090124', 'UCT202208231770', 'UCT202208161180', 'UCT201909102844', 'UCT201909261866', 'UCT202012031317', 'UCT201909121720', 'UCT202012073065', 'UCT201908203053']
+
+test_id_pre_csv: './csv/pre_therapy_test.csv'
+test_id_post_csv: './csv/post_therapy_test.csv'
+
+
+
+# csv dir
+csv_dir: './csv/'
+
+# nii csv
+all_ct_origin_nii_csv_path: './csv/all_ct_origin_nii_data.csv'
+
+# resample csv
+all_ct_resample_nii_csv_path: './csv/all_ct_resample_nii_data_new.csv'
+
+# 3D volumes csv
+all_ct_prep_volumes_data_csv_path: './csv/all_ct_prep_volumes_data.csv'
+
+# 2D slices csv
+all_ct_prep_slices_data_csv_path: './csv/all_ct_prep_slices_data.csv'
+
+# splitting seed
+random_seed: 2023
+
+# 数据划分折数
+kfold: 5
+
+
+# cate name to label
+cate_to_label_dict: {'bg':0, "Tumor": 1,}
+label_to_cate_dict: {'0':'bg', '1':'Tumor'}
+
+# root for nnunet
+nnunet:
+  base: /data/zoule/dataset/s4_nnunet_data/nnUNet_raw_data_base
+  preprocessing_output_dir: /data/zoule/dataset/s4_nnunet_data/nnUNet_preprocessed
+  network_training_output_dir_base: ./ckpt/

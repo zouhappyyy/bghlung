@@ -1,0 +1,51 @@
+# ===============================
+# raw data 子集构建配置
+# ===============================
+data:
+  # nnUNet_raw_data 根目录（绝对路径）
+  nnunet_raw_root: /home/fangzheng/zoule/ESO_nnUNet_dataset/nnUNet_raw_data
+
+  # 源 Task（全量）
+  source_task: Task501_ESO_PreSeg
+
+  # 目标 Task（子集）
+  target_task: Task503_EsoTJ_10pct
+
+  # 抽样比例（0.1 = 10%）
+  sample_ratio: 0.1
+  train_ratio: 0.7
+
+  # 是否只使用 pre（imagesTr）
+  use_pre_only: true
+
+  # 按中心过滤（case_id 前缀）
+  # 例：SY_001, TJ_002
+  centers:
+#    - SY
+    - TJ
+#    - XY
+
+
+# ===============================
+# 实验可复现性
+# ===============================
+experiment:
+  random_seed: 42
+
+
+# ===============================
+# dataset.json 继承与控制
+# ===============================
+dataset_json:
+  inherit_from_source: true
+  auto_update_num_training: true
+
+  keep_keys:
+    - name
+    - description
+    - tensorImageSize
+    - reference
+    - licence
+    - release
+    - modality
+    - labels

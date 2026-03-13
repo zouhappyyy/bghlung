@@ -1,0 +1,71 @@
+nohup: 忽略输入
+/home/fangzheng/miniconda3/envs/zl_nnunetv1/lib/python3.9/site-packages/monai/utils/module.py:303: UserWarning: pkg_resources is deprecated as an API. See https://setuptools.pypa.io/en/latest/pkg_resources.html. The pkg_resources package is slated for removal as early as 2025-11-30. Refrain from using this package or pin to Setuptools<81.
+  pkg = __import__(module)  # top level module
+###############################################
+I am running the following nnUNet: 3d_fullres
+My trainer class is:  <class 'nnunet.training.network_training.PHTransTrainerV2.PHTransTrainerV2'>
+For that I will be using the following configuration:
+num_classes:  1
+modalities:  {0: 'CT'}
+use_mask_for_norm OrderedDict([(0, False)])
+keep_only_largest_region None
+min_region_size_per_class None
+min_size_per_class None
+normalization_schemes OrderedDict([(0, 'CT')])
+stages...
+
+stage:  0
+{'batch_size': 2, 'num_pool_per_axis': [4, 5, 4], 'patch_size': array([128, 128, 112]), 'median_patient_size_in_voxels': array([128, 128, 128]), 'current_spacing': array([2., 1., 1.]), 'original_spacing': array([2., 1., 1.]), 'do_dummy_2D_data_aug': False, 'pool_op_kernel_sizes': [[1, 2, 2], [2, 2, 2], [2, 2, 2], [2, 2, 2], [2, 2, 1]], 'conv_kernel_sizes': [[1, 3, 3], [3, 3, 3], [3, 3, 3], [3, 3, 3], [3, 3, 3], [3, 3, 3]]}
+
+I am using stage 0 from these plans
+I am using sample dice + CE loss
+
+I am using data from this folder:  /home/fangzheng/zoule/ESO_nnUNet_dataset/nnUNet_preprocessed/Task503_EsoTJ_10pct/nnUNetData_plans_v2.1
+###############################################
+loading dataset
+loading all case properties
+2026-01-10 20:55:28.511811: Using splits from existing split file: /home/fangzheng/zoule/ESO_nnUNet_dataset/nnUNet_preprocessed/Task503_EsoTJ_10pct/splits_final.pkl
+2026-01-10 20:55:28.511925: The split file contains 5 splits.
+2026-01-10 20:55:28.511941: Desired fold for training: 0
+2026-01-10 20:55:28.511967: This split has 8 training and 3 validation cases.
+unpacking dataset
+/home/fangzheng/miniconda3/envs/zl_nnunetv1/lib/python3.9/site-packages/torch/functional.py:478: UserWarning: torch.meshgrid: in an upcoming release, it will be required to pass the indexing argument. (Triggered internally at  /opt/conda/conda-bld/pytorch_1659484809662/work/aten/src/ATen/native/TensorShape.cpp:2894.)
+  return _VF.meshgrid(tensors, **kwargs)  # type: ignore[attr-defined]
+done
+Traceback (most recent call last):
+  File "/home/fangzheng/miniconda3/envs/zl_nnunetv1/lib/python3.9/site-packages/einops/einops.py", line 532, in reduce
+    return _apply_recipe(
+  File "/home/fangzheng/miniconda3/envs/zl_nnunetv1/lib/python3.9/site-packages/einops/einops.py", line 235, in _apply_recipe
+    init_shapes, axes_reordering, reduced_axes, added_axes, final_shapes, n_axes_w_added = _reconstruct_from_shape(
+  File "/home/fangzheng/miniconda3/envs/zl_nnunetv1/lib/python3.9/site-packages/einops/einops.py", line 188, in _reconstruct_from_shape_uncached
+    raise EinopsError(f"Shape mismatch, can't divide axis of length {length} in chunks of {known_product}")
+einops.EinopsError: Shape mismatch, can't divide axis of length 64 in chunks of 5
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/home/fangzheng/zoule/BGHNet_esov1/./nnunet/run/run_training.py", line 200, in <module>
+    main()
+  File "/home/fangzheng/zoule/BGHNet_esov1/./nnunet/run/run_training.py", line 163, in main
+    trainer.initialize(not validation_only)
+  File "/home/fangzheng/zoule/BGHNet_esov1/nnunet/training/network_training/nnUNetTrainerV2.py", line 123, in initialize
+    self.initialize_network()
+  File "/home/fangzheng/zoule/BGHNet_esov1/nnunet/training/network_training/PHTransTrainerV2.py", line 40, in initialize_network
+    self.network = PHTrans(img_size=self.patch_size,
+  File "/home/fangzheng/zoule/BGHNet_esov1/nnunet/network_architecture/phtrans.py", line 217, in __init__
+    layer = BasicLayer(num_stage=i_layer,
+  File "/home/fangzheng/zoule/BGHNet_esov1/nnunet/network_architecture/phtrans.py", line 113, in __init__
+    self.swin_blocks = nn.ModuleList([
+  File "/home/fangzheng/zoule/BGHNet_esov1/nnunet/network_architecture/phtrans.py", line 114, in <listcomp>
+    SwinTransformerBlock(dim=dim, input_resolution=input_resolution,
+  File "/home/fangzheng/zoule/BGHNet_esov1/nnunet/network_architecture/swin_3D.py", line 237, in __init__
+    mask_windows = window_partition(img_mask, self.window_size)
+  File "/home/fangzheng/zoule/BGHNet_esov1/nnunet/network_architecture/swin_3D.py", line 37, in window_partition
+    windows = rearrange(x, 'b (s p1) (h p2) (w p3) c -> (b s h w) p1 p2 p3 c',
+  File "/home/fangzheng/miniconda3/envs/zl_nnunetv1/lib/python3.9/site-packages/einops/einops.py", line 600, in rearrange
+    return reduce(tensor, pattern, reduction="rearrange", **axes_lengths)
+  File "/home/fangzheng/miniconda3/envs/zl_nnunetv1/lib/python3.9/site-packages/einops/einops.py", line 542, in reduce
+    raise EinopsError(message + "\n {}".format(e))
+einops.EinopsError:  Error while processing rearrange-reduction pattern "b (s p1) (h p2) (w p3) c -> (b s h w) p1 p2 p3 c".
+ Input tensor shape: torch.Size([1, 64, 32, 28, 1]). Additional info: {'p1': 5, 'p2': 5, 'p3': 5, 'c': 1}.
+ Shape mismatch, can't divide axis of length 64 in chunks of 5

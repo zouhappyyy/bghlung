@@ -1,0 +1,154 @@
+{
+    "author": "Fabian",
+    "description": "",
+    "id": "91dee1f6224a",
+    "name": "UNet3DTrainer val tiled True",
+    "results": {
+        "all": [
+            {
+                "0": {
+                    "Accuracy": 0.9968786239624023,
+                    "Dice": 0.9984310563597344,
+                    "False Discovery Rate": 0.00019968702898343071,
+                    "False Negative Rate": 0.0029344549046564916,
+                    "False Omission Rate": 0.4412611575007198,
+                    "False Positive Rate": 0.050868182929811656,
+                    "Hausdorff Distance 95": 0.0,
+                    "Jaccard": 0.9968670281756876,
+                    "Negative Predictive Value": 0.5587388424992802,
+                    "Precision": 0.9998003129710166,
+                    "Recall": 0.9970655450953435,
+                    "Total Positives Reference": 2088974,
+                    "Total Positives Test": 2083260,
+                    "True Negative Rate": 0.9491318170701883
+                },
+                "1": {
+                    "Accuracy": 0.9968786239624023,
+                    "Dice": 0.7033982782057091,
+                    "False Discovery Rate": 0.4412611575007198,
+                    "False Negative Rate": 0.050868182929811656,
+                    "False Omission Rate": 0.00019968702898342022,
+                    "False Positive Rate": 0.0029344549046564916,
+                    "Hausdorff Distance 95": 28.26569226029539,
+                    "Jaccard": 0.5424937098126922,
+                    "Negative Predictive Value": 0.9998003129710166,
+                    "Precision": 0.5587388424992802,
+                    "Recall": 0.9491318170701883,
+                    "Total Positives Reference": 8178,
+                    "Total Positives Test": 13892,
+                    "True Negative Rate": 0.9970655450953435
+                },
+                "reference": "/home/fangzheng/zoule/ESO_nnUNet_dataset/nnUNet_preprocessed/Task503_EsoTJ_10pct/gt_segmentations/ESO_TJ_1009540774.nii.gz",
+                "test": "./ckpt/nnUNet/3d_fullres/Task503_EsoTJ_10pct/UNet3DTrainer__nnUNetPlansv2.1/fold_0/validation_raw/ESO_TJ_1009540774.nii.gz"
+            },
+            {
+                "0": {
+                    "Accuracy": 0.9983987808227539,
+                    "Dice": 0.9991920896968098,
+                    "False Discovery Rate": 0.0007742534036593307,
+                    "False Negative Rate": 0.0008415649354679422,
+                    "False Omission Rate": 0.09195100152463068,
+                    "False Positive Rate": 0.0852179439648324,
+                    "Hausdorff Distance 95": 0.0,
+                    "Jaccard": 0.9983854837779103,
+                    "Negative Predictive Value": 0.9080489984753694,
+                    "Precision": 0.9992257465963407,
+                    "Recall": 0.9991584350645321,
+                    "Total Positives Reference": 2078271,
+                    "Total Positives Test": 2078131,
+                    "True Negative Rate": 0.9147820560351676
+                },
+                "1": {
+                    "Accuracy": 0.9983987808227539,
+                    "Dice": 0.911403092185109,
+                    "False Discovery Rate": 0.09195100152463065,
+                    "False Negative Rate": 0.0852179439648324,
+                    "False Omission Rate": 0.0007742534036593458,
+                    "False Positive Rate": 0.0008415649354679422,
+                    "Hausdorff Distance 95": 2.449489742783178,
+                    "Jaccard": 0.837227338826951,
+                    "Negative Predictive Value": 0.9992257465963407,
+                    "Precision": 0.9080489984753694,
+                    "Recall": 0.9147820560351676,
+                    "Total Positives Reference": 18881,
+                    "Total Positives Test": 19021,
+                    "True Negative Rate": 0.9991584350645321
+                },
+                "reference": "/home/fangzheng/zoule/ESO_nnUNet_dataset/nnUNet_preprocessed/Task503_EsoTJ_10pct/gt_segmentations/ESO_TJ_60010480766.nii.gz",
+                "test": "./ckpt/nnUNet/3d_fullres/Task503_EsoTJ_10pct/UNet3DTrainer__nnUNetPlansv2.1/fold_0/validation_raw/ESO_TJ_60010480766.nii.gz"
+            },
+            {
+                "0": {
+                    "Accuracy": 0.9980945587158203,
+                    "Dice": 0.9990390715064502,
+                    "False Discovery Rate": 0.00037439503681147013,
+                    "False Negative Rate": 0.0015467740532257857,
+                    "False Omission Rate": 0.1681910834683531,
+                    "False Positive Rate": 0.046606361948121955,
+                    "Hausdorff Distance 95": 0.0,
+                    "Jaccard": 0.9980799880071323,
+                    "Negative Predictive Value": 0.8318089165316469,
+                    "Precision": 0.9996256049631885,
+                    "Recall": 0.9984532259467742,
+                    "Total Positives Reference": 2080459,
+                    "Total Positives Test": 2078019,
+                    "True Negative Rate": 0.953393638051878
+                },
+                "1": {
+                    "Accuracy": 0.9980945587158203,
+                    "Dice": 0.888460894322559,
+                    "False Discovery Rate": 0.1681910834683531,
+                    "False Negative Rate": 0.046606361948121955,
+                    "False Omission Rate": 0.00037439503681150173,
+                    "False Positive Rate": 0.0015467740532257857,
+                    "Hausdorff Distance 95": 8.0,
+                    "Jaccard": 0.7993069157751996,
+                    "Negative Predictive Value": 0.9996256049631885,
+                    "Precision": 0.8318089165316469,
+                    "Recall": 0.953393638051878,
+                    "Total Positives Reference": 16693,
+                    "Total Positives Test": 19133,
+                    "True Negative Rate": 0.9984532259467742
+                },
+                "reference": "/home/fangzheng/zoule/ESO_nnUNet_dataset/nnUNet_preprocessed/Task503_EsoTJ_10pct/gt_segmentations/ESO_TJ_60015513981.nii.gz",
+                "test": "./ckpt/nnUNet/3d_fullres/Task503_EsoTJ_10pct/UNet3DTrainer__nnUNetPlansv2.1/fold_0/validation_raw/ESO_TJ_60015513981.nii.gz"
+            }
+        ],
+        "mean": {
+            "0": {
+                "Accuracy": 0.9977906545003256,
+                "Dice": 0.9988874058543314,
+                "False Discovery Rate": 0.00044944515648474387,
+                "False Negative Rate": 0.0017742646311167398,
+                "False Omission Rate": 0.23380108083123452,
+                "False Positive Rate": 0.060897496280922,
+                "Hausdorff Distance 95": 0.0,
+                "Jaccard": 0.9977774999869101,
+                "Negative Predictive Value": 0.7661989191687656,
+                "Precision": 0.9995505548435153,
+                "Recall": 0.9982257353688833,
+                "Total Positives Reference": 2082568.0,
+                "Total Positives Test": 2079803.3333333333,
+                "True Negative Rate": 0.939102503719078
+            },
+            "1": {
+                "Accuracy": 0.9977906545003256,
+                "Dice": 0.834420754904459,
+                "False Discovery Rate": 0.23380108083123452,
+                "False Negative Rate": 0.060897496280922,
+                "False Omission Rate": 0.0004494451564847559,
+                "False Positive Rate": 0.0017742646311167398,
+                "Hausdorff Distance 95": 12.905060667692856,
+                "Jaccard": 0.7263426548049475,
+                "Negative Predictive Value": 0.9995505548435153,
+                "Precision": 0.7661989191687656,
+                "Recall": 0.939102503719078,
+                "Total Positives Reference": 14584.0,
+                "Total Positives Test": 17348.666666666668,
+                "True Negative Rate": 0.9982257353688833
+            }
+        }
+    },
+    "task": "Task503_EsoTJ_10pct",
+    "timestamp": "2026-01-10 16:14:22.811123"
+}
