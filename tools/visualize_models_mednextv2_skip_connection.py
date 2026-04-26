@@ -468,3 +468,5 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+
+# python tools/visualize_models_mednextv2_skip_connection.py --fold 2
