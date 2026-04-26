@@ -1,10 +1,10 @@
 {
     "dc_per_class_pp_all": {
-        "1": 0.9118526523662206
+        "1": 0.9118512250892971
     },
     "dc_per_class_pp_per_class": {},
     "dc_per_class_raw": {
-        "1": 0.9118526523662206
+        "1": 0.9118512250892971
     },
     "for_which_classes": [],
     "min_valid_object_sizes": "None",

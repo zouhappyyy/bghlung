@@ -1,13 +1,14 @@
 {
     "author": "Fabian",
     "description": "",
-    "id": "2decab7381c0",
+    "id": "d4ae00172de0",
     "name": "",
     "results": {
         "all": [
             {
                 "1": {
                     "Accuracy": 0.9976577758789062,
+                    "Avg. Symmetric Surface Distance": 0.7776536790826014,
                     "Dice": 0.9248975597822763,
                     "False Discovery Rate": 0.06503863987635239,
                     "False Negative Rate": 0.08495189689598837,
@@ -28,6 +29,7 @@
             {
                 "1": {
                     "Accuracy": 0.9947352409362793,
+                    "Avg. Symmetric Surface Distance": 2.1389456646969283,
                     "Dice": 0.8644893650968986,
                     "False Discovery Rate": 0.1396394195534275,
                     "False Negative Rate": 0.13134203191673044,
@@ -47,20 +49,21 @@
             },
             {
                 "1": {
-                    "Accuracy": 0.9969768524169922,
-                    "Dice": 0.9606235637538041,
-                    "False Discovery Rate": 0.04327440525527937,
+                    "Accuracy": 0.9969773292541504,
+                    "Avg. Symmetric Surface Distance": 0.48396451499202003,
+                    "Dice": 0.9606295300262718,
+                    "False Discovery Rate": 0.043262569279493235,
                     "False Negative Rate": 0.03544657445402044,
-                    "False Omission Rate": 0.0014094991913481945,
-                    "False Positive Rate": 0.0017342802959877668,
+                    "False Omission Rate": 0.0014094984923028091,
+                    "False Positive Rate": 0.0017337845040220623,
                     "Hausdorff Distance 95": 1.4142135623730951,
-                    "Jaccard": 0.9242306543172991,
-                    "Negative Predictive Value": 0.9985905008086519,
-                    "Precision": 0.9567255947447206,
+                    "Jaccard": 0.9242416999306834,
+                    "Negative Predictive Value": 0.9985905015076972,
+                    "Precision": 0.9567374307205068,
                     "Recall": 0.9645534255459796,
                     "Total Positives Reference": 80177,
-                    "Total Positives Test": 80833,
-                    "True Negative Rate": 0.9982657197040122
+                    "Total Positives Test": 80832,
+                    "True Negative Rate": 0.9982662154959779
                 },
                 "reference": "/home/fangzheng/zoule/ESO_nnUNet_dataset/nnUNet_preprocessed/Task530_EsoTJ_30pct/gt_segmentations/ESO_TJ_60011448192.nii.gz",
                 "test": "./ckpt/nnUNet/3d_fullres/Task530_EsoTJ_30pct/BGHNetV4Trainer__nnUNetPlansv2.1/fold_1/validation_raw_postprocessed/ESO_TJ_60011448192.nii.gz"
@@ -68,6 +71,7 @@
             {
                 "1": {
                     "Accuracy": 0.9945411682128906,
+                    "Avg. Symmetric Surface Distance": 1.6110188285001572,
                     "Dice": 0.9177290693496227,
                     "False Discovery Rate": 0.029074099417605637,
                     "False Negative Rate": 0.12994127025222446,
@@ -88,6 +92,7 @@
             {
                 "1": {
                     "Accuracy": 0.9978170394897461,
+                    "Avg. Symmetric Surface Distance": 0.8433793528208265,
                     "Dice": 0.9314424344075716,
                     "False Discovery Rate": 0.027457234887575455,
                     "False Negative Rate": 0.106324894393517,
@@ -108,6 +113,7 @@
             {
                 "1": {
                     "Accuracy": 0.9979972839355469,
+                    "Avg. Symmetric Surface Distance": 0.580111085226621,
                     "Dice": 0.9368857632314489,
                     "False Discovery Rate": 0.0602050045221586,
                     "False Negative Rate": 0.06600551294343238,
@@ -128,6 +134,7 @@
             {
                 "1": {
                     "Accuracy": 0.9930763244628906,
+                    "Avg. Symmetric Surface Distance": 1.2726181736039504,
                     "Dice": 0.8692386664505323,
                     "False Discovery Rate": 0.19290587999197273,
                     "False Negative Rate": 0.05824844865940759,
@@ -148,23 +155,24 @@
         ],
         "mean": {
             "1": {
-                "Accuracy": 0.9961145264761788,
-                "Dice": 0.9150437745817364,
-                "False Discovery Rate": 0.07965638335776738,
+                "Accuracy": 0.9961145945957729,
+                "Avg. Symmetric Surface Distance": 1.101098756989015,
+                "Dice": 0.9150446269063747,
+                "False Discovery Rate": 0.07965469250408365,
                 "False Negative Rate": 0.08746580421647439,
-                "False Omission Rate": 0.0020539387100974244,
-                "False Positive Rate": 0.0019298825553314889,
+                "False Omission Rate": 0.0020539386102337983,
+                "False Positive Rate": 0.001929811727907817,
                 "Hausdorff Distance 95": 5.783441398725829,
-                "Jaccard": 0.845067710124827,
-                "Negative Predictive Value": 0.9979460612899026,
-                "Precision": 0.9203436166422326,
+                "Jaccard": 0.8450692880695961,
+                "Negative Predictive Value": 0.9979460613897662,
+                "Precision": 0.9203453074959163,
                 "Recall": 0.9125341957835256,
                 "Total Positives Reference": 49511.71428571428,
-                "Total Positives Test": 49260.42857142857,
-                "True Negative Rate": 0.9980701174446683
+                "Total Positives Test": 49260.28571428572,
+                "True Negative Rate": 0.998070188272092
             }
         }
     },
     "task": "",
-    "timestamp": "2026-03-13 17:18:15.791417"
+    "timestamp": "2026-03-13 21:32:52.560730"
 }
