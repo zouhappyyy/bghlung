@@ -23,6 +23,7 @@ from typing import Dict, List, Optional, Sequence, Tuple
 import numpy as np
 import torch
 
+from feature_heatmap_montage import build_all_case_montages
 from visualize_nnunetv2_skip_connection import (
     CKPT_BASE,
     NETWORK,
@@ -306,6 +307,11 @@ def main() -> None:
         default="cuda" if torch.cuda.is_available() else "cpu",
         help="Device to use",
     )
+    parser.add_argument(
+        "--skip-montage",
+        action="store_true",
+        help="Do not create per-case montage images after batch processing",
+    )
     args = parser.parse_args()
 
     checkpoint_dir = Path(args.checkpoint_dir) if args.checkpoint_dir else CKPT_BASE / f"fold_{args.fold}"
@@ -366,6 +372,7 @@ def main() -> None:
     print(f"Total jobs: {total_jobs}\n")
 
     expected_in = getattr(trainer.network, "num_input_channels", None)
+    case_output_dirs: List[Path] = []
 
     job_idx = 0
     for checkpoint_path in checkpoints:
@@ -398,6 +405,8 @@ def main() -> None:
                 / f"fold_{args.fold}"
                 / case_id
             )
+            if outdir not in case_output_dirs:
+                case_output_dirs.append(outdir)
             save_outputs(
                 outdir=outdir,
                 case_id=case_id,
@@ -409,6 +418,16 @@ def main() -> None:
                 data=data,
                 heatmap_resized=heatmap_resized,
             )
+
+    if not args.skip_montage:
+        montage_outputs = build_all_case_montages(
+            case_dirs=case_output_dirs,
+            marker=f"_{args.backend}_first_skip_3views.png",
+            out_name=f"{args.backend}_first_skip_montage.png",
+            title_prefix=f"{TASK} | {TRAINER_NAME} | fold_{args.fold}",
+            ncols=4,
+        )
+        print(f"Created {len(montage_outputs)} montage image(s)")
 
     print(f"\n{'=' * 72}")
     print("Batch visualization complete")
