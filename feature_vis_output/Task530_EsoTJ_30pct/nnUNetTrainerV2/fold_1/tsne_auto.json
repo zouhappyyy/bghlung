@@ -1,0 +1,10 @@
+{
+  "trainer": "nnUNetTrainerV2",
+  "task": "Task530_EsoTJ_30pct",
+  "fold": 1,
+  "method": "tsne",
+  "feature_layer": "auto",
+  "num_cases": 12,
+  "checkpoint": "ckpt/nnUNet/3d_fullres/Task530_EsoTJ_30pct/nnUNetTrainerV2__nnUNetPlansv2.1/fold_1/model_final_checkpoint.model",
+  "validation_raw_dir": "ckpt/nnUNet/3d_fullres/Task530_EsoTJ_30pct/nnUNetTrainerV2__nnUNetPlansv2.1/fold_1/validation_raw"
+}

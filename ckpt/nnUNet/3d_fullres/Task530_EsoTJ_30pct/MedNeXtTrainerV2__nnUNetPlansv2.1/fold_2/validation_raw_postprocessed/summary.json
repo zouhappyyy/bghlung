@@ -1,0 +1,178 @@
+{
+    "author": "Fabian",
+    "description": "",
+    "id": "82fa8dee3d6d",
+    "name": "",
+    "results": {
+        "all": [
+            {
+                "1": {
+                    "Accuracy": 0.9984526634216309,
+                    "Avg. Symmetric Surface Distance": 0.5585515429944178,
+                    "Dice": 0.9389590113052801,
+                    "False Discovery Rate": 0.09520011600928069,
+                    "False Negative Rate": 0.02420143097313998,
+                    "False Omission Rate": 0.0002990962365092618,
+                    "False Positive Rate": 0.0012676345292832458,
+                    "Hausdorff Distance 95": 2.0,
+                    "Jaccard": 0.8849413182994716,
+                    "Negative Predictive Value": 0.9997009037634907,
+                    "Precision": 0.9047998839907193,
+                    "Recall": 0.97579856902686,
+                    "Total Positives Reference": 25577,
+                    "Total Positives Test": 27584,
+                    "True Negative Rate": 0.9987323654707168
+                },
+                "reference": "/home/fangzheng/zoule/ESO_nnUNet_dataset/nnUNet_preprocessed/Task530_EsoTJ_30pct/gt_segmentations/ESO_TJ_60011632915.nii.gz",
+                "test": "./ckpt/nnUNet/3d_fullres/Task530_EsoTJ_30pct/MedNeXtTrainerV2__nnUNetPlansv2.1/fold_2/validation_raw_postprocessed/ESO_TJ_60011632915.nii.gz"
+            },
+            {
+                "1": {
+                    "Accuracy": 0.9976277351379395,
+                    "Avg. Symmetric Surface Distance": 0.7214703533390533,
+                    "Dice": 0.9080831408775981,
+                    "False Discovery Rate": 0.06955171891564438,
+                    "False Negative Rate": 0.11323205715729079,
+                    "False Omission Rate": 0.0015154002916831664,
+                    "False Positive Rate": 0.0008876801877223395,
+                    "Hausdorff Distance 95": 2.449489742783178,
+                    "Jaccard": 0.8316412859560067,
+                    "Negative Predictive Value": 0.9984845997083168,
+                    "Precision": 0.9304482810843556,
+                    "Recall": 0.8867679428427092,
+                    "Total Positives Reference": 27713,
+                    "Total Positives Test": 26412,
+                    "True Negative Rate": 0.9991123198122777
+                },
+                "reference": "/home/fangzheng/zoule/ESO_nnUNet_dataset/nnUNet_preprocessed/Task530_EsoTJ_30pct/gt_segmentations/ESO_TJ_60012088441.nii.gz",
+                "test": "./ckpt/nnUNet/3d_fullres/Task530_EsoTJ_30pct/MedNeXtTrainerV2__nnUNetPlansv2.1/fold_2/validation_raw_postprocessed/ESO_TJ_60012088441.nii.gz"
+            },
+            {
+                "1": {
+                    "Accuracy": 0.996361255645752,
+                    "Avg. Symmetric Surface Distance": 1.4120455410577053,
+                    "Dice": 0.8827497195888327,
+                    "False Discovery Rate": 0.08220709926834724,
+                    "False Negative Rate": 0.14971584181861242,
+                    "False Omission Rate": 0.0024483833070407237,
+                    "False Positive Rate": 0.001246990357512523,
+                    "Hausdorff Distance 95": 8.48528137423857,
+                    "Jaccard": 0.7901091949280744,
+                    "Negative Predictive Value": 0.9975516166929593,
+                    "Precision": 0.9177929007316528,
+                    "Recall": 0.8502841581813876,
+                    "Total Positives Reference": 33784,
+                    "Total Positives Test": 31299,
+                    "True Negative Rate": 0.9987530096424875
+                },
+                "reference": "/home/fangzheng/zoule/ESO_nnUNet_dataset/nnUNet_preprocessed/Task530_EsoTJ_30pct/gt_segmentations/ESO_TJ_60013786525.nii.gz",
+                "test": "./ckpt/nnUNet/3d_fullres/Task530_EsoTJ_30pct/MedNeXtTrainerV2__nnUNetPlansv2.1/fold_2/validation_raw_postprocessed/ESO_TJ_60013786525.nii.gz"
+            },
+            {
+                "1": {
+                    "Accuracy": 0.9984588623046875,
+                    "Avg. Symmetric Surface Distance": 0.5503478997645885,
+                    "Dice": 0.9367192700787094,
+                    "False Discovery Rate": 0.0597460791635549,
+                    "False Negative Rate": 0.06678890492724221,
+                    "False Omission Rate": 0.0008263700873336097,
+                    "False Positive Rate": 0.0007337610709822195,
+                    "Hausdorff Distance 95": 2.0,
+                    "Jaccard": 0.8809707951239274,
+                    "Negative Predictive Value": 0.9991736299126663,
+                    "Precision": 0.9402539208364451,
+                    "Recall": 0.9332110950727578,
+                    "Total Positives Reference": 25633,
+                    "Total Positives Test": 25441,
+                    "True Negative Rate": 0.9992662389290178
+                },
+                "reference": "/home/fangzheng/zoule/ESO_nnUNet_dataset/nnUNet_preprocessed/Task530_EsoTJ_30pct/gt_segmentations/ESO_TJ_60015113400.nii.gz",
+                "test": "./ckpt/nnUNet/3d_fullres/Task530_EsoTJ_30pct/MedNeXtTrainerV2__nnUNetPlansv2.1/fold_2/validation_raw_postprocessed/ESO_TJ_60015113400.nii.gz"
+            },
+            {
+                "1": {
+                    "Accuracy": 0.9976687431335449,
+                    "Avg. Symmetric Surface Distance": 0.6248382188086383,
+                    "Dice": 0.9391105077653096,
+                    "False Discovery Rate": 0.025737764225541415,
+                    "False Negative Rate": 0.09359297992547178,
+                    "False Omission Rate": 0.0018912251621848242,
+                    "False Positive Rate": 0.00048454020005284093,
+                    "Hausdorff Distance 95": 2.449489742783178,
+                    "Jaccard": 0.8852104904792092,
+                    "Negative Predictive Value": 0.9981087748378151,
+                    "Precision": 0.9742622357744586,
+                    "Recall": 0.9064070200745282,
+                    "Total Positives Reference": 41595,
+                    "Total Positives Test": 38698,
+                    "True Negative Rate": 0.9995154597999472
+                },
+                "reference": "/home/fangzheng/zoule/ESO_nnUNet_dataset/nnUNet_preprocessed/Task530_EsoTJ_30pct/gt_segmentations/ESO_TJ_60016089044.nii.gz",
+                "test": "./ckpt/nnUNet/3d_fullres/Task530_EsoTJ_30pct/MedNeXtTrainerV2__nnUNetPlansv2.1/fold_2/validation_raw_postprocessed/ESO_TJ_60016089044.nii.gz"
+            },
+            {
+                "1": {
+                    "Accuracy": 0.9963769912719727,
+                    "Avg. Symmetric Surface Distance": 3.044592337772744,
+                    "Dice": 0.6654631912645298,
+                    "False Discovery Rate": 0.31894376351838505,
+                    "False Negative Rate": 0.34943181818181823,
+                    "False Omission Rate": 0.0019457771028198669,
+                    "False Positive Rate": 0.0016969258742116633,
+                    "Hausdorff Distance 95": 14.45683229480096,
+                    "Jaccard": 0.49864731111844274,
+                    "Negative Predictive Value": 0.9980542228971802,
+                    "Precision": 0.681056236481615,
+                    "Recall": 0.6505681818181818,
+                    "Total Positives Reference": 11616,
+                    "Total Positives Test": 11096,
+                    "True Negative Rate": 0.9983030741257883
+                },
+                "reference": "/home/fangzheng/zoule/ESO_nnUNet_dataset/nnUNet_preprocessed/Task530_EsoTJ_30pct/gt_segmentations/ESO_TJ_60016973126.nii.gz",
+                "test": "./ckpt/nnUNet/3d_fullres/Task530_EsoTJ_30pct/MedNeXtTrainerV2__nnUNetPlansv2.1/fold_2/validation_raw_postprocessed/ESO_TJ_60016973126.nii.gz"
+            },
+            {
+                "1": {
+                    "Accuracy": 0.998997688293457,
+                    "Avg. Symmetric Surface Distance": 0.4620382714100583,
+                    "Dice": 0.9376852840033203,
+                    "False Discovery Rate": 0.08105752469494476,
+                    "False Negative Rate": 0.04279142960900617,
+                    "False Omission Rate": 0.00033991332450616414,
+                    "False Positive Rate": 0.0006704700018744791,
+                    "Hausdorff Distance 95": 2.0,
+                    "Jaccard": 0.8826812524418151,
+                    "Negative Predictive Value": 0.9996600866754939,
+                    "Precision": 0.9189424753050552,
+                    "Recall": 0.9572085703909938,
+                    "Total Positives Reference": 16522,
+                    "Total Positives Test": 17210,
+                    "True Negative Rate": 0.9993295299981255
+                },
+                "reference": "/home/fangzheng/zoule/ESO_nnUNet_dataset/nnUNet_preprocessed/Task530_EsoTJ_30pct/gt_segmentations/ESO_TJ_60017000815.nii.gz",
+                "test": "./ckpt/nnUNet/3d_fullres/Task530_EsoTJ_30pct/MedNeXtTrainerV2__nnUNetPlansv2.1/fold_2/validation_raw_postprocessed/ESO_TJ_60017000815.nii.gz"
+            }
+        ],
+        "mean": {
+            "1": {
+                "Accuracy": 0.9977062770298549,
+                "Avg. Symmetric Surface Distance": 1.053412023592458,
+                "Dice": 0.8869671606976544,
+                "False Discovery Rate": 0.10463486654224263,
+                "False Negative Rate": 0.11996492322751165,
+                "False Omission Rate": 0.0013237379302968027,
+                "False Positive Rate": 0.0009982860316627587,
+                "Hausdorff Distance 95": 4.834441879229412,
+                "Jaccard": 0.8077430926209924,
+                "Negative Predictive Value": 0.9986762620697033,
+                "Precision": 0.8953651334577574,
+                "Recall": 0.8800350767724883,
+                "Total Positives Reference": 26062.85714285714,
+                "Total Positives Test": 25391.428571428572,
+                "True Negative Rate": 0.9990017139683374
+            }
+        }
+    },
+    "task": "",
+    "timestamp": "2026-04-25 04:41:46.245642"
+}
