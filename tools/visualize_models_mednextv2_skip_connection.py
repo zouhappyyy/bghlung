@@ -55,6 +55,9 @@ def default_plans_path() -> Path:
 
 def find_epoch_checkpoints(checkpoint_dir: Path, include_final: bool) -> List[Path]:
     checkpoints = sorted(checkpoint_dir.glob("model_ep_*.model"))
+    best_ckpt = checkpoint_dir / "model_best.model"
+    if best_ckpt.is_file():
+        checkpoints.append(best_ckpt)
     if include_final:
         final_ckpt = checkpoint_dir / "model_final_checkpoint.model"
         if final_ckpt.is_file():
@@ -107,6 +110,8 @@ def choose_case_files(
 
 
 def checkpoint_tag(checkpoint_path: Path) -> str:
+    if checkpoint_path.name == "model_best.model":
+        return "best"
     if checkpoint_path.name == "model_final_checkpoint.model":
         return "final"
 
