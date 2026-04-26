@@ -18,7 +18,7 @@ import importlib
 import json
 import re
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional, Sequence, Tuple
 
 import numpy as np
 import torch
@@ -54,23 +54,46 @@ def find_epoch_checkpoints(checkpoint_dir: Path, include_final: bool) -> List[Pa
     return checkpoints
 
 
+def _find_npz_files(directory: Path, recursive: bool) -> List[Path]:
+    pattern = "**/*.npz" if recursive else "*.npz"
+    return sorted(directory.glob(pattern))
+
+
 def choose_case_files(
-    validation_raw_dir: Path,
+    candidate_dirs: Sequence[Path],
     case_id: Optional[str],
     max_cases: Optional[int],
-) -> List[Path]:
-    case_files = sorted(validation_raw_dir.glob("*.npz"))
-    if not case_files:
-        raise RuntimeError(f"No npz files found in {validation_raw_dir}")
+) -> Tuple[List[Path], Path]:
+    searched_dirs: List[Path] = []
+    case_files: List[Path] = []
+
+    for idx, candidate_dir in enumerate(candidate_dirs):
+        if candidate_dir in searched_dirs:
+            continue
+        searched_dirs.append(candidate_dir)
+        recursive = idx > 0
+        if not candidate_dir.is_dir():
+            continue
+        case_files = _find_npz_files(candidate_dir, recursive=recursive)
+        if case_files:
+            source_dir = candidate_dir
+            break
+    else:
+        searched_text = "\n".join(f"  - {d}" for d in searched_dirs)
+        raise RuntimeError(
+            "No npz files found. Checked these directories:\n"
+            f"{searched_text}\n"
+            "Use --validation-raw-dir to point to the folder containing input .npz files."
+        )
 
     if case_id is not None:
         case_files = [f for f in case_files if f.stem == case_id]
         if not case_files:
-            raise FileNotFoundError(f"Case {case_id} not found in {validation_raw_dir}")
+            raise FileNotFoundError(f"Case {case_id} not found under {source_dir}")
 
     if max_cases is not None:
         case_files = case_files[:max_cases]
-    return case_files
+    return case_files, source_dir
 
 
 def checkpoint_tag(checkpoint_path: Path) -> str:
@@ -261,7 +284,12 @@ def main() -> None:
     parser.add_argument(
         "--validation-raw-dir",
         default=None,
-        help="Custom validation_raw directory",
+        help="Directory containing input .npz files",
+    )
+    parser.add_argument(
+        "--case-dir",
+        default=None,
+        help="Alias for --validation-raw-dir",
     )
     parser.add_argument(
         "--include-final",
@@ -276,13 +304,15 @@ def main() -> None:
     args = parser.parse_args()
 
     checkpoint_dir = Path(args.checkpoint_dir) if args.checkpoint_dir else CKPT_BASE / f"fold_{args.fold}"
+    validation_raw_dir_arg = args.case_dir or args.validation_raw_dir
     validation_raw_dir = (
-        Path(args.validation_raw_dir)
-        if args.validation_raw_dir
+        Path(validation_raw_dir_arg)
+        if validation_raw_dir_arg
         else Path(default_validation_raw_dir(args.fold))
     )
     plans_file = args.plans_file or str(default_plans_path())
     dataset_directory = args.dataset_directory or str(default_dataset_directory(TASK))
+    dataset_directory_path = Path(dataset_directory)
     output_folder = str(CKPT_BASE / f"fold_{args.fold}")
 
     print(f"\n{'=' * 72}")
@@ -294,7 +324,8 @@ def main() -> None:
     print(f"Backend:            {args.backend}")
     print(f"Device:             {args.device}")
     print(f"Checkpoint dir:     {checkpoint_dir}")
-    print(f"Validation raw dir: {validation_raw_dir}")
+    print(f"Requested case dir: {validation_raw_dir}")
+    print(f"Dataset directory:  {dataset_directory_path}")
     print(f"Output dir:         {args.output_dir}")
     print(f"{'=' * 72}\n")
 
@@ -313,11 +344,20 @@ def main() -> None:
     print("Initialized trainer")
 
     checkpoints = find_epoch_checkpoints(checkpoint_dir, args.include_final)
-    case_files = choose_case_files(validation_raw_dir, args.case_id, args.max_cases)
+    candidate_case_dirs = [
+        validation_raw_dir,
+        dataset_directory_path,
+    ]
+    case_files, resolved_case_dir = choose_case_files(
+        candidate_case_dirs,
+        args.case_id,
+        args.max_cases,
+    )
     total_jobs = len(checkpoints) * len(case_files)
 
     print(f"Found {len(checkpoints)} checkpoints")
     print(f"Found {len(case_files)} cases")
+    print(f"Resolved case dir: {resolved_case_dir}")
     print(f"Total jobs: {total_jobs}\n")
 
     expected_in = getattr(trainer.network, "num_input_channels", None)
