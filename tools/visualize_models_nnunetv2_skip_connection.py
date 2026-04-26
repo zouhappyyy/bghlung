@@ -420,4 +420,4 @@ if __name__ == "__main__":
     main()
 
 
-# python tools/visualize_models_nnunetv2_skip_connection.py --fold 2
+# python tools/visualize_models_nnunetv2_skip_connection.py --fold 3 --validation-raw-dir ckpt/nnUNet/3d_fullres/Task530_EsoTJ_30pct/nnUNetTrainerV2__nnUNetPlansv2.1/fold_1/validation_raw
