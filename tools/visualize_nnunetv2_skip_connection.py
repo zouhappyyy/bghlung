@@ -42,6 +42,7 @@ import torch.nn.functional as F
 TASK = "Task530_EsoTJ_30pct"
 TRAINER_NAME = "nnUNetTrainerV2"
 NETWORK = "3d_fullres"
+HEATMAP_IMSHOW_KWARGS = {"cmap": "jet", "vmin": 0, "vmax": 1}
 
 # Hardcoded paths for this specific trainer/task setup
 CKPT_BASE = Path("/home/fangzheng/zoule/ESO_nnUNet_dataset") / TASK / f"{TRAINER_NAME}__nnUNetPlansv2.1"
@@ -335,7 +336,7 @@ def plot_single_view_overlay(
     axes[0].axis("off")
 
     axes[1].imshow(image, cmap="gray")
-    axes[1].imshow(heatmap, cmap="jet", vmin=0, vmax=1)
+    axes[1].imshow(heatmap, **HEATMAP_IMSHOW_KWARGS)
     axes[1].set_title("Heatmap Overlay")
     axes[1].axis("off")
 
@@ -371,7 +372,7 @@ def plot_multi_view_overlay(
         # Right: CT with heatmap overlay
         ax = axes[row, 1]
         ax.imshow(img, cmap="gray")
-        ax.imshow(hm, cmap="jet", vmin=0, vmax=1)
+        ax.imshow(hm, **HEATMAP_IMSHOW_KWARGS)
         ax.set_title(f"{axis.title()} Heatmap Overlay (slice {idx})")
         ax.axis("off")
 
