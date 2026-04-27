@@ -44,6 +44,7 @@ NETWORK = "3d_fullres"
 HEATMAP_IMSHOW_KWARGS = {"cmap": "jet", "vmin": 0, "vmax": 1, "interpolation": "bilinear"}
 ACTIVATION_TOPK = 8
 HEATMAP_CLIP_QUANTILE = 0.99
+HEATMAP_DISPLAY_QUANTILE = 0.99
 
 # Hardcoded paths for this specific trainer/task setup
 CKPT_BASE = Path("/home/fangzheng/zoule/ESO_nnUNet_dataset") / TASK / f"{TRAINER_NAME}__nnUNetPlansv2.1"
@@ -242,7 +243,8 @@ def extract_skip_connection_features(
 def make_heatmap(
     feature_map: torch.Tensor,
     backend: str,
-    grad: Optional[torch.Tensor] = None
+    grad: Optional[torch.Tensor] = None,
+    normalize: str = "quantile",
 ) -> np.ndarray:
     """Generate heatmap from feature map.
 
@@ -250,6 +252,7 @@ def make_heatmap(
         feature_map: (B, C, D, H, W) tensor
         backend: "activation" or "gradcam"
         grad: gradients for grad-CAM (B, C, D, H, W)
+        normalize: "quantile" or "none"
 
     Returns:
         (D, H, W) normalized heatmap as numpy array
@@ -271,9 +274,33 @@ def make_heatmap(
 
     cam = cam[0]
     cam = cam - cam.min()
-    clip_value = torch.quantile(cam.reshape(-1), HEATMAP_CLIP_QUANTILE)
-    cam = torch.clamp(cam / (clip_value + 1e-8), 0, 1)
+    if normalize == "quantile":
+        clip_value = torch.quantile(cam.reshape(-1), HEATMAP_CLIP_QUANTILE)
+        cam = torch.clamp(cam / (clip_value + 1e-8), 0, 1)
+    elif normalize == "none":
+        pass
+    else:
+        raise ValueError(f"Unknown normalization mode: {normalize}")
     return cam.detach().cpu().numpy()
+
+
+def resolve_heatmap_imshow_kwargs(heatmap: np.ndarray) -> Dict[str, float | str]:
+    if heatmap.size == 0:
+        return dict(HEATMAP_IMSHOW_KWARGS)
+
+    max_value = float(np.max(heatmap))
+    if max_value <= 1.0 + 1e-6:
+        return dict(HEATMAP_IMSHOW_KWARGS)
+
+    vmax = float(np.quantile(heatmap.reshape(-1), HEATMAP_DISPLAY_QUANTILE))
+    if vmax <= 0:
+        vmax = max_value if max_value > 0 else 1.0
+    return {
+        "cmap": HEATMAP_IMSHOW_KWARGS["cmap"],
+        "vmin": 0,
+        "vmax": vmax,
+        "interpolation": HEATMAP_IMSHOW_KWARGS["interpolation"],
+    }
 
 
 def resize_to_original(arr: np.ndarray, target_shape: Tuple[int, int, int]) -> np.ndarray:
@@ -335,12 +362,13 @@ def plot_single_view_overlay(
 ) -> None:
     """Plot original image and heatmap-only view for a single slice."""
     fig, axes = plt.subplots(1, 2, figsize=(12, 5))
+    heatmap_kwargs = resolve_heatmap_imshow_kwargs(heatmap)
 
     axes[0].imshow(image, cmap="gray")
     axes[0].set_title("CT Image")
     axes[0].axis("off")
 
-    axes[1].imshow(heatmap, **HEATMAP_IMSHOW_KWARGS)
+    axes[1].imshow(heatmap, **heatmap_kwargs)
     axes[1].set_title("Feature Heatmap")
     axes[1].axis("off")
 
@@ -366,6 +394,7 @@ def plot_multi_view_overlay(
     for row, axis in enumerate(("axial", "coronal", "sagittal")):
         idx = slices[axis]
         img, hm = get_view_slices(data, heatmap, axis, idx)
+        heatmap_kwargs = resolve_heatmap_imshow_kwargs(hm)
 
         # Left: CT image only
         ax = axes[row, 0]
@@ -375,7 +404,7 @@ def plot_multi_view_overlay(
 
         # Right: heatmap only
         ax = axes[row, 1]
-        ax.imshow(hm, **HEATMAP_IMSHOW_KWARGS)
+        ax.imshow(hm, **heatmap_kwargs)
         ax.set_title(f"{axis.title()} Feature Heatmap (slice {idx})")
         ax.axis("off")
 
@@ -398,6 +427,8 @@ def main() -> None:
     parser.add_argument("--case-id", default=None, help="Case ID; defaults to first case")
     parser.add_argument("--backend", choices=["activation", "gradcam"], default="activation",
                         help="Heatmap generation backend")
+    parser.add_argument("--normalize", choices=["quantile", "none"], default="quantile",
+                        help="Heatmap normalization mode")
     parser.add_argument("--output-dir", default="heatmap_output",
                         help="Output directory")
     parser.add_argument("--checkpoint", default=None, help="Custom checkpoint path")
@@ -429,6 +460,7 @@ def main() -> None:
     print(f"Trainer:            {TRAINER_NAME}")
     print(f"Fold:               {args.fold}")
     print(f"Backend:            {args.backend}")
+    print(f"Normalize:          {args.normalize}")
     print(f"Device:             {args.device}")
     print(f"Checkpoint:         {checkpoint}")
     print(f"Plans file:         {plans_file}")
@@ -528,9 +560,9 @@ def main() -> None:
         grad = grad_holder.get("tensor").grad if grad_holder.get("tensor") is not None else None
         if grad is None:
             raise RuntimeError(f"Failed to capture gradients from '{layer_name}'")
-        heatmap = make_heatmap(feat_map, "gradcam", grad=grad)
+        heatmap = make_heatmap(feat_map, "gradcam", grad=grad, normalize=args.normalize)
     else:
-        heatmap = make_heatmap(feat_map, "activation")
+        heatmap = make_heatmap(feat_map, "activation", normalize=args.normalize)
 
     print(f"\nGenerated heatmap:")
     print(f"  Heatmap shape:    {tuple(heatmap.shape)}")
@@ -556,7 +588,7 @@ def main() -> None:
     outdir = Path(args.output_dir) / TASK / TRAINER_NAME / f"fold_{args.fold}"
     outdir.mkdir(parents=True, exist_ok=True)
 
-    stem = f"{case_file.stem}_{args.backend}_first_skip"
+    stem = f"{case_file.stem}_{args.backend}_{args.normalize}_first_skip"
 
     # Save single-view overlay (axial)
     axial_idx = slices["axial"]
@@ -583,6 +615,7 @@ def main() -> None:
         "fold": args.fold,
         "case_id": case_file.stem,
         "backend": args.backend,
+        "normalize": args.normalize,
         "layer_name": layer_name,
         "target_feature": "first_skip_connection",
         "checkpoint": str(checkpoint),

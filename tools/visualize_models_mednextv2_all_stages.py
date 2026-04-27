@@ -111,6 +111,12 @@ def main() -> None:
         help="Output directory root",
     )
     parser.add_argument(
+        "--normalize",
+        choices=["quantile", "none"],
+        default="quantile",
+        help="Heatmap normalization mode",
+    )
+    parser.add_argument(
         "--case-id",
         default=None,
         help="Specific case ID to process; defaults to all available cases",
@@ -242,6 +248,7 @@ def main() -> None:
                     x,
                     args.backend,
                     layer_name,
+                    args.normalize,
                 )
                 heatmap_resized = resize_to_original(heatmap, original_shape)
 
@@ -249,6 +256,7 @@ def main() -> None:
                     outdir=outdir,
                     case_id=case_id,
                     backend=args.backend,
+                    normalize=args.normalize,
                     checkpoint_path=checkpoint_path,
                     checkpoint_name=ckpt_name,
                     layer_name=resolved_layer_name,
@@ -260,8 +268,8 @@ def main() -> None:
     if not args.skip_montage:
         total_montages = 0
         for layer_name in stage_layers:
-            marker = f"_{args.backend}_{layer_name.replace('.', '_')}_3views.png"
-            out_name = f"{args.backend}_{layer_name.replace('.', '_')}_montage.png"
+            marker = f"_{args.backend}_{args.normalize}_{layer_name.replace('.', '_')}_3views.png"
+            out_name = f"{args.backend}_{args.normalize}_{layer_name.replace('.', '_')}_montage.png"
             montage_outputs = build_all_case_montages(
                 case_dirs=case_output_dirs,
                 marker=marker,

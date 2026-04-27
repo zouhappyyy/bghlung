@@ -160,6 +160,7 @@ def extract_heatmap(
     x: torch.Tensor,
     backend: str,
     target_layer: str,
+    normalize: str,
 ) -> Tuple[np.ndarray, str, List[int]]:
     net = _unwrap_module(network)
     layer_name, target_module = find_target_layer(net, target_layer)
@@ -194,7 +195,7 @@ def extract_heatmap(
         if grad is None:
             raise RuntimeError(f"Failed to capture gradients from '{layer_name}'")
 
-        heatmap = make_heatmap(feat_map, "gradcam", grad=grad)
+        heatmap = make_heatmap(feat_map, "gradcam", grad=grad, normalize=normalize)
         return heatmap, layer_name, list(feat_map.shape)
 
     captured: Dict[str, torch.Tensor] = {}
@@ -216,7 +217,7 @@ def extract_heatmap(
     if feat_map is None:
         raise RuntimeError(f"Failed to capture features from '{layer_name}'")
 
-    heatmap = make_heatmap(feat_map, "activation")
+    heatmap = make_heatmap(feat_map, "activation", normalize=normalize)
     return heatmap, layer_name, list(feat_map.shape)
 
 
@@ -225,6 +226,7 @@ def save_outputs(
     outdir: Path,
     case_id: str,
     backend: str,
+    normalize: str,
     checkpoint_path: Path,
     checkpoint_name: str,
     layer_name: str,
@@ -236,7 +238,7 @@ def save_outputs(
     slices = pick_middle_slices(
         (int(data.shape[2]), int(data.shape[3]), int(data.shape[4]))
     )
-    stem = f"{checkpoint_name}_{backend}_{layer_name.replace('.', '_')}"
+    stem = f"{checkpoint_name}_{backend}_{normalize}_{layer_name.replace('.', '_')}"
 
     axial_idx = slices["axial"]
     plot_single_view_overlay(
@@ -259,6 +261,7 @@ def save_outputs(
         "network": NETWORK,
         "case_id": case_id,
         "backend": backend,
+        "normalize": normalize,
         "layer_name": layer_name,
         "target_feature": "mednext_decoder_feature",
         "checkpoint": str(checkpoint_path),
@@ -298,6 +301,12 @@ def main() -> None:
         "--output-dir",
         default="heatmap_output_mednext_all_epochs",
         help="Output directory root",
+    )
+    parser.add_argument(
+        "--normalize",
+        choices=["quantile", "none"],
+        default="quantile",
+        help="Heatmap normalization mode",
     )
     parser.add_argument(
         "--case-id",
@@ -420,6 +429,7 @@ def main() -> None:
                 x,
                 args.backend,
                 args.target_layer,
+                args.normalize,
             )
             original_shape = (int(data.shape[2]), int(data.shape[3]), int(data.shape[4]))
             heatmap_resized = resize_to_original(heatmap, original_shape)
@@ -437,6 +447,7 @@ def main() -> None:
                 outdir=outdir,
                 case_id=case_id,
                 backend=args.backend,
+                normalize=args.normalize,
                 checkpoint_path=checkpoint_path,
                 checkpoint_name=ckpt_name,
                 layer_name=layer_name,
@@ -448,8 +459,8 @@ def main() -> None:
     if not args.skip_montage:
         montage_outputs = build_all_case_montages(
             case_dirs=case_output_dirs,
-            marker=f"_{args.backend}_{args.target_layer.replace('.', '_')}_3views.png",
-            out_name=f"{args.backend}_{args.target_layer.replace('.', '_')}_montage.png",
+            marker=f"_{args.backend}_{args.normalize}_{args.target_layer.replace('.', '_')}_3views.png",
+            out_name=f"{args.backend}_{args.normalize}_{args.target_layer.replace('.', '_')}_montage.png",
             title_prefix=f"{TASK} | {TRAINER_NAME} | fold_{args.fold}",
             ncols=4,
         )
