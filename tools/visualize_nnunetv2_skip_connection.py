@@ -41,7 +41,9 @@ import torch.nn.functional as F
 TASK = "Task530_EsoTJ_30pct"
 TRAINER_NAME = "nnUNetTrainerV2"
 NETWORK = "3d_fullres"
-HEATMAP_IMSHOW_KWARGS = {"cmap": "jet", "vmin": 0, "vmax": 1}
+HEATMAP_IMSHOW_KWARGS = {"cmap": "jet", "vmin": 0, "vmax": 1, "interpolation": "bilinear"}
+ACTIVATION_TOPK = 8
+HEATMAP_CLIP_QUANTILE = 0.99
 
 # Hardcoded paths for this specific trainer/task setup
 CKPT_BASE = Path("/home/fangzheng/zoule/ESO_nnUNet_dataset") / TASK / f"{TRAINER_NAME}__nnUNetPlansv2.1"
@@ -253,8 +255,11 @@ def make_heatmap(
         (D, H, W) normalized heatmap as numpy array
     """
     if backend == "activation":
-        # Channel-wise max preserves sparse high-response regions.
-        cam = feature_map.abs().max(dim=1, keepdim=False).values
+        # Averaging only the strongest channels keeps salient regions while
+        # avoiding the over-sparse maps produced by a pure channel-wise max.
+        k = min(ACTIVATION_TOPK, feature_map.shape[1])
+        topk = torch.topk(feature_map.abs(), k=k, dim=1).values
+        cam = topk.mean(dim=1)
     elif backend == "gradcam":
         if grad is None:
             raise RuntimeError("Grad-CAM requires gradients")
@@ -266,7 +271,8 @@ def make_heatmap(
 
     cam = cam[0]
     cam = cam - cam.min()
-    cam = cam / (cam.max() + 1e-8)
+    clip_value = torch.quantile(cam.reshape(-1), HEATMAP_CLIP_QUANTILE)
+    cam = torch.clamp(cam / (clip_value + 1e-8), 0, 1)
     return cam.detach().cpu().numpy()
 
 
@@ -327,16 +333,15 @@ def plot_single_view_overlay(
     out_png: Path,
     title: str
 ) -> None:
-    """Plot image and heatmap overlay for a single view."""
+    """Plot original image and heatmap-only view for a single slice."""
     fig, axes = plt.subplots(1, 2, figsize=(12, 5))
 
     axes[0].imshow(image, cmap="gray")
     axes[0].set_title("CT Image")
     axes[0].axis("off")
 
-    axes[1].imshow(image, cmap="gray")
     axes[1].imshow(heatmap, **HEATMAP_IMSHOW_KWARGS)
-    axes[1].set_title("Heatmap Overlay")
+    axes[1].set_title("Feature Heatmap")
     axes[1].axis("off")
 
     fig.suptitle(title, fontsize=12, fontweight="bold")
@@ -352,7 +357,7 @@ def plot_multi_view_overlay(
     out_png: Path,
     title: str
 ) -> None:
-    """Plot three-view heatmap overlays (axial, coronal, sagittal)."""
+    """Plot three-view image/heatmap pairs (axial, coronal, sagittal)."""
     volume_shape = (int(data.shape[2]), int(data.shape[3]), int(data.shape[4]))
     slices = pick_middle_slices(volume_shape)
 
@@ -368,11 +373,10 @@ def plot_multi_view_overlay(
         ax.set_title(f"{axis.title()} CT Image (slice {idx})")
         ax.axis("off")
 
-        # Right: CT with heatmap overlay
+        # Right: heatmap only
         ax = axes[row, 1]
-        ax.imshow(img, cmap="gray")
         ax.imshow(hm, **HEATMAP_IMSHOW_KWARGS)
-        ax.set_title(f"{axis.title()} Heatmap Overlay (slice {idx})")
+        ax.set_title(f"{axis.title()} Feature Heatmap (slice {idx})")
         ax.axis("off")
 
     fig.suptitle(title, fontsize=14, fontweight="bold")
