@@ -38,6 +38,10 @@ import torch.nn.functional as F
 from nnunet.network_architecture.BGHNetV4 import BGHNetV4
 
 
+PATCH_SIZE = (80, 80, 80)
+DISPLAY_CROP_SIZE = 64
+
+
 def _default_task_dir(task: str) -> str:
     return task if task.startswith("Task") else f"Task{task}"
 
@@ -178,7 +182,7 @@ def _load_case_data(data_root: Path, dataset_dir: Path, case_id: Optional[str]) 
 
 
 def _build_model(device: str) -> BGHNetV4:
-    patch_size = np.array([80, 80, 80])
+    patch_size = np.array(PATCH_SIZE)
     pool_op_kernel_sizes = [
         [2, 2, 2],
         [2, 2, 2],
@@ -294,6 +298,70 @@ def _choose_slice_index(seg: Optional[np.ndarray], axis: str, volume_shape: Tupl
     return volume_shape[axis_map[axis]] // 2
 
 
+def _compute_crop_bounds(center: int, size: int, limit: int) -> Tuple[int, int]:
+    start = center - size // 2
+    end = start + size
+    if start < 0:
+        end -= start
+        start = 0
+    if end > limit:
+        start -= end - limit
+        end = limit
+    start = max(0, start)
+    end = min(limit, end)
+    return start, end
+
+
+def _crop_or_pad_to_patch(
+    data: np.ndarray,
+    seg: Optional[np.ndarray],
+    patch_size: Tuple[int, int, int],
+) -> Tuple[np.ndarray, Optional[np.ndarray], Dict[str, List[int]]]:
+    spatial_shape = tuple(int(i) for i in data.shape[1:])
+
+    if seg is not None and np.any(seg > 0):
+        fg = np.argwhere(seg > 0)
+        center = [int(round((fg[:, i].min() + fg[:, i].max()) / 2.0)) for i in range(3)]
+    else:
+        center = [s // 2 for s in spatial_shape]
+
+    slices = []
+    crop_bbox = []
+    for c, size, limit in zip(center, patch_size, spatial_shape):
+        start, end = _compute_crop_bounds(c, size, limit)
+        slices.append(slice(start, end))
+        crop_bbox.append([int(start), int(end)])
+
+    cropped_data = data[:, slices[0], slices[1], slices[2]]
+    cropped_seg = None if seg is None else seg[slices[0], slices[1], slices[2]]
+
+    pad_width_data = [(0, 0)]
+    pad_width_seg = []
+    final_shape = tuple(int(i) for i in cropped_data.shape[1:])
+    for size, current in zip(patch_size, final_shape):
+        total_pad = max(0, size - current)
+        before = total_pad // 2
+        after = total_pad - before
+        pad_width_data.append((before, after))
+        pad_width_seg.append((before, after))
+
+    if any(pad != (0, 0) for pad in pad_width_data[1:]):
+        cropped_data = np.pad(cropped_data, pad_width_data, mode="constant", constant_values=0)
+        if cropped_seg is not None:
+            cropped_seg = np.pad(cropped_seg, pad_width_seg, mode="constant", constant_values=0)
+
+    crop_info = {
+        "original_shape": list(spatial_shape),
+        "patch_size": list(patch_size),
+        "crop_bbox_zyx": crop_bbox,
+        "crop_center_zyx": [int(i) for i in center],
+        "cropped_shape_before_pad": list(final_shape),
+        "pad_width_zyx": [[int(a), int(b)] for a, b in pad_width_seg],
+        "final_patch_shape": list(cropped_data.shape[1:]),
+    }
+    return cropped_data, cropped_seg, crop_info
+
+
 def _slice_2d(volume: np.ndarray, axis: str, idx: int) -> np.ndarray:
     if axis == "axial":
         return volume[idx]
@@ -302,6 +370,45 @@ def _slice_2d(volume: np.ndarray, axis: str, idx: int) -> np.ndarray:
     if axis == "sagittal":
         return volume[:, :, idx]
     raise ValueError(axis)
+
+
+def _crop_2d_center(image: np.ndarray, crop_size: int) -> Tuple[np.ndarray, Dict[str, List[int]]]:
+    h, w = image.shape
+    target_h = min(crop_size, h)
+    target_w = min(crop_size, w)
+    cy = h // 2
+    cx = w // 2
+
+    y1 = cy - target_h // 2
+    x1 = cx - target_w // 2
+    y2 = y1 + target_h
+    x2 = x1 + target_w
+
+    if y1 < 0:
+        y2 -= y1
+        y1 = 0
+    if x1 < 0:
+        x2 -= x1
+        x1 = 0
+    if y2 > h:
+        y1 -= y2 - h
+        y2 = h
+    if x2 > w:
+        x1 -= x2 - w
+        x2 = w
+
+    y1 = max(0, y1)
+    x1 = max(0, x1)
+    y2 = min(h, y2)
+    x2 = min(w, x2)
+
+    cropped = image[y1:y2, x1:x2]
+    crop_info = {
+        "y_range": [int(y1), int(y2)],
+        "x_range": [int(x1), int(x2)],
+        "shape": [int(cropped.shape[0]), int(cropped.shape[1])],
+    }
+    return cropped, crop_info
 
 
 def _save_overlay_png(image: np.ndarray, heatmap: np.ndarray, out_file: Path, title: str) -> None:
@@ -411,6 +518,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--case-id", default=None, help="Case id without suffix; defaults to the first .npy case")
     parser.add_argument("--axis", choices=["axial", "coronal", "sagittal"], default="axial")
     parser.add_argument("--slice-index", type=int, default=None, help="Override slice index")
+    parser.add_argument("--no-crop", action="store_true", help="Disable automatic 80x80x80 patch cropping")
+    parser.add_argument("--display-crop-size", type=int, default=DISPLAY_CROP_SIZE, help="Center crop size for saved 2D visualization PNGs")
     parser.add_argument("--output-dir", default="feature_vis_output")
     parser.add_argument("--device", default="cuda" if torch.cuda.is_available() else "cpu")
     return parser.parse_args()
@@ -438,16 +547,24 @@ def main() -> None:
     _load_checkpoint(model, checkpoint, args.device)
 
     case_name, data, seg = _load_case_data(data_root, dataset_dir, resolved_case_id)
-    x = torch.from_numpy(data[None]).to(args.device)
+    crop_info = None
+    if args.no_crop:
+        patch_data = data
+        patch_seg = seg
+    else:
+        patch_data, patch_seg, crop_info = _crop_or_pad_to_patch(data, seg, PATCH_SIZE)
 
-    if x.shape != (1, 1, data.shape[1], data.shape[2], data.shape[3]):
+    x = torch.from_numpy(patch_data[None]).to(args.device)
+
+    if x.shape != (1, 1, patch_data.shape[1], patch_data.shape[2], patch_data.shape[3]):
         raise RuntimeError(f"Unexpected input tensor shape {tuple(x.shape)}")
 
     stage_tensors = _collect_stage_tensors(model, x)
-    volume_shape = (int(data.shape[1]), int(data.shape[2]), int(data.shape[3]))
-    slice_index = _choose_slice_index(seg, args.axis, volume_shape, args.slice_index)
+    volume_shape = (int(patch_data.shape[1]), int(patch_data.shape[2]), int(patch_data.shape[3]))
+    slice_index = _choose_slice_index(patch_seg, args.axis, volume_shape, args.slice_index)
 
-    image_2d = _slice_2d(data[0], args.axis, slice_index)
+    image_2d_full = _slice_2d(patch_data[0], args.axis, slice_index)
+    image_2d, display_crop_info = _crop_2d_center(image_2d_full, args.display_crop_size)
 
     out_base = Path(args.output_dir) / task_dir / "BGHNetV4Trainer" / f"fold_{args.fold}" / case_name
     heatmap_dir = out_base / "heatmaps_npy"
@@ -469,7 +586,8 @@ def main() -> None:
         tensor_shapes[name] = list(tensor.shape)
         heatmap_3d = _make_activation_heatmap(tensor, volume_shape)
         np.save(heatmap_dir / f"{name}.npy", heatmap_3d)
-        heatmap_2d = _slice_2d(heatmap_3d, args.axis, slice_index)
+        heatmap_2d_full = _slice_2d(heatmap_3d, args.axis, slice_index)
+        heatmap_2d, _ = _crop_2d_center(heatmap_2d_full, args.display_crop_size)
         _save_overlay_png(
             image_2d,
             heatmap_2d,
@@ -510,9 +628,13 @@ def main() -> None:
         "data_root": str(data_root),
         "requested_case_id": args.case_id,
         "resolved_case_id": resolved_case_id,
+        "auto_crop_enabled": not args.no_crop,
+        "crop_info": crop_info,
         "axis": args.axis,
         "slice_index": slice_index,
         "volume_shape": list(volume_shape),
+        "display_crop_size": args.display_crop_size,
+        "display_crop_info": display_crop_info,
         "stage_tensor_shapes": tensor_shapes,
         "saved_groups": [name for name, group in groups.items() if group],
         "colormap": "jet",
