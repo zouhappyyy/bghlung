@@ -40,6 +40,14 @@ from nnunet.network_architecture.BGHNetV4 import BGHNetV4
 
 PATCH_SIZE = (80, 80, 80)
 DISPLAY_CROP_SIZE = 64
+SUMMARY_STAGE_NAMES = (
+    "encoder_stage0",
+    "bottleneck",
+    "seg_decoder_stage0",
+    "bdr_decoder_stage0",
+    "seg_output_stage0",
+    "bdr_output_stage0",
+)
 
 
 def _default_task_dir(task: str) -> str:
@@ -459,6 +467,57 @@ def _save_montage(
     plt.close(fig)
 
 
+def _save_global_case_montage(
+    case_stage_maps: "OrderedDict[str, OrderedDict[str, np.ndarray]]",
+    out_file: Path,
+    title: str,
+) -> None:
+    case_names = list(case_stage_maps.keys())
+    stage_names = [name for name in SUMMARY_STAGE_NAMES if any(name in stages for stages in case_stage_maps.values())]
+    if not case_names or not stage_names:
+        return
+
+    rows = len(case_names)
+    cols = len(stage_names)
+    fig, axes = plt.subplots(rows, cols, figsize=(3.0 * cols, 3.0 * rows))
+    axes = np.atleast_2d(axes)
+    if rows == 1:
+        axes = axes.reshape(1, cols)
+    if cols == 1:
+        axes = axes.reshape(rows, 1)
+
+    for r, case_name in enumerate(case_names):
+        for c, stage_name in enumerate(stage_names):
+            ax = axes[r, c]
+            stage_map = case_stage_maps[case_name].get(stage_name)
+            if stage_map is None:
+                ax.axis("off")
+                continue
+            image = stage_map["image"]
+            heatmap = stage_map["heatmap"]
+            ax.imshow(image, cmap="gray")
+            ax.imshow(heatmap, cmap="jet", vmin=0, vmax=1, alpha=0.55)
+            ax.axis("off")
+            if r == 0:
+                ax.set_title(stage_name, fontsize=10)
+            if c == 0:
+                ax.text(
+                    -0.05,
+                    0.5,
+                    case_name,
+                    transform=ax.transAxes,
+                    rotation=90,
+                    va="center",
+                    ha="right",
+                    fontsize=9,
+                )
+
+    fig.suptitle(title)
+    plt.tight_layout()
+    plt.savefig(out_file, dpi=300, bbox_inches="tight")
+    plt.close(fig)
+
+
 def _collect_stage_tensors(model: BGHNetV4, x: torch.Tensor) -> "OrderedDict[str, torch.Tensor]":
     captures: "OrderedDict[str, torch.Tensor]" = OrderedDict()
     handles = []
@@ -516,6 +575,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--dataset-directory", default=None, help="Task root that contains gt_segmentations")
     parser.add_argument("--data-root", default=None, help="Stage0 preprocessed .npy directory")
     parser.add_argument("--case-id", default=None, help="Case id without suffix; defaults to the first .npy case")
+    parser.add_argument("--all-cases", action="store_true", help="Visualize all validation cases listed in validation_raw/summary.json")
     parser.add_argument("--axis", choices=["axial", "coronal", "sagittal"], default="axial")
     parser.add_argument("--slice-index", type=int, default=None, help="Override slice index")
     parser.add_argument("--no-crop", action="store_true", help="Disable automatic 80x80x80 patch cropping")
@@ -525,24 +585,17 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def main() -> None:
-    args = parse_args()
-
-    task_dir = _default_task_dir(args.task)
-    checkpoint = Path(args.checkpoint) if args.checkpoint else _default_checkpoint(args.task, args.fold)
-    validation_raw_dir = Path(args.validation_raw_dir) if args.validation_raw_dir else _default_validation_raw_dir(args.task, args.fold)
-    dataset_dir = Path(args.dataset_directory) if args.dataset_directory else _default_dataset_dir(args.task)
-    data_root = Path(args.data_root) if args.data_root else _default_stage0_dir(args.task)
-    resolved_case_id = _resolve_case_id(args.case_id, validation_raw_dir, data_root)
-
-    print(f"[INFO] task={task_dir}")
-    print(f"[INFO] checkpoint={checkpoint}")
-    print(f"[INFO] validation_raw_dir={validation_raw_dir}")
-    print(f"[INFO] dataset_dir={dataset_dir}")
-    print(f"[INFO] data_root={data_root}")
-    print(f"[INFO] requested_case_id={args.case_id}")
-    print(f"[INFO] resolved_case_id={resolved_case_id}")
-
+def _run_one_case(
+    model: BGHNetV4,
+    args: argparse.Namespace,
+    task_dir: str,
+    checkpoint: Path,
+    validation_raw_dir: Path,
+    dataset_dir: Path,
+    data_root: Path,
+    case_id: Optional[str],
+):
+    resolved_case_id = _resolve_case_id(case_id, validation_raw_dir, data_root)
     model = _build_model(args.device)
     _load_checkpoint(model, checkpoint, args.device)
 
@@ -581,6 +634,7 @@ def main() -> None:
         "other": OrderedDict(),
     }
     tensor_shapes: Dict[str, List[int]] = {}
+    summary_stage_maps: "OrderedDict[str, Dict[str, np.ndarray]]" = OrderedDict()
 
     for name, tensor in stage_tensors.items():
         tensor_shapes[name] = list(tensor.shape)
@@ -594,6 +648,11 @@ def main() -> None:
             overlay_dir / f"{name}_{args.axis}_{slice_index:03d}.png",
             title=f"{case_name} | {name} | {args.axis}={slice_index}",
         )
+        if name in SUMMARY_STAGE_NAMES:
+            summary_stage_maps[name] = {
+                "image": image_2d,
+                "heatmap": heatmap_2d,
+            }
 
         if name.startswith("encoder_"):
             groups["encoder"][name] = heatmap_2d
@@ -644,6 +703,75 @@ def main() -> None:
     print(f"[OK] Case: {case_name}")
     print(f"[OK] Saved directory: {out_base}")
     print(f"[OK] Saved {len(stage_tensors)} stage heatmaps with jet colormap.")
+    return case_name, summary_stage_maps
+
+
+def main() -> None:
+    args = parse_args()
+
+    task_dir = _default_task_dir(args.task)
+    checkpoint = Path(args.checkpoint) if args.checkpoint else _default_checkpoint(args.task, args.fold)
+    validation_raw_dir = Path(args.validation_raw_dir) if args.validation_raw_dir else _default_validation_raw_dir(args.task, args.fold)
+    dataset_dir = Path(args.dataset_directory) if args.dataset_directory else _default_dataset_dir(args.task)
+    data_root = Path(args.data_root) if args.data_root else _default_stage0_dir(args.task)
+
+    all_validation_cases = _load_validation_case_ids(validation_raw_dir)
+    if args.all_cases:
+        requested_case_ids = all_validation_cases
+    else:
+        requested_case_ids = [args.case_id]
+
+    print(f"[INFO] task={task_dir}")
+    print(f"[INFO] checkpoint={checkpoint}")
+    print(f"[INFO] validation_raw_dir={validation_raw_dir}")
+    print(f"[INFO] dataset_dir={dataset_dir}")
+    print(f"[INFO] data_root={data_root}")
+    print(f"[INFO] requested_case_id={args.case_id}")
+    print(f"[INFO] all_cases={args.all_cases}")
+    print(f"[INFO] validation_case_count={len(all_validation_cases)}")
+
+    global_summary: "OrderedDict[str, OrderedDict[str, Dict[str, np.ndarray]]]" = OrderedDict()
+    processed_case_ids: List[str] = []
+
+    for case_id in requested_case_ids:
+        case_name, summary_stage_maps = _run_one_case(
+            _build_model(args.device),
+            args,
+            task_dir,
+            checkpoint,
+            validation_raw_dir,
+            dataset_dir,
+            data_root,
+            case_id,
+        )
+        global_summary[case_name] = OrderedDict(summary_stage_maps)
+        processed_case_ids.append(case_name)
+
+    if args.all_cases and global_summary:
+        summary_dir = Path(args.output_dir) / task_dir / "BGHNetV4Trainer" / f"fold_{args.fold}"
+        summary_dir.mkdir(parents=True, exist_ok=True)
+        big_png = summary_dir / f"all_cases_summary_{args.axis}_crop{args.display_crop_size}.png"
+        _save_global_case_montage(
+            global_summary,
+            big_png,
+            title=f"{task_dir} | BGHNetV4 fold {args.fold} | all validation cases | {args.axis}",
+        )
+        global_meta = {
+            "task": task_dir,
+            "fold": args.fold,
+            "validation_raw_dir": str(validation_raw_dir),
+            "processed_cases": processed_case_ids,
+            "summary_stage_names": list(SUMMARY_STAGE_NAMES),
+            "axis": args.axis,
+            "display_crop_size": args.display_crop_size,
+            "colormap": "jet",
+            "summary_png": str(big_png),
+        }
+        (summary_dir / f"all_cases_summary_{args.axis}_crop{args.display_crop_size}.json").write_text(
+            json.dumps(global_meta, ensure_ascii=False, indent=2),
+            encoding="utf-8",
+        )
+        print(f"[OK] Saved global summary montage: {big_png}")
 
 
 if __name__ == "__main__":
