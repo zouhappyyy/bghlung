@@ -1,0 +1,26 @@
+{
+  "task": "Task530_EsoTJ_30pct",
+  "fold": 1,
+  "validation_raw_dir": "ckpt/nnUNet/3d_fullres/Task530_EsoTJ_30pct/BGHNetV4Trainer__nnUNetPlansv2.1/fold_1/validation_raw",
+  "processed_cases": [
+    "ESO_TJ_60011222468",
+    "ESO_TJ_60011433208",
+    "ESO_TJ_60011448192",
+    "ESO_TJ_60013355605",
+    "ESO_TJ_60015218276",
+    "ESO_TJ_60015513981",
+    "ESO_TJ_60015631521"
+  ],
+  "summary_stage_names": [
+    "encoder_stage0",
+    "bottleneck",
+    "seg_decoder_stage0",
+    "bdr_decoder_stage0",
+    "seg_output_stage0",
+    "bdr_output_stage0"
+  ],
+  "axis": "axial",
+  "display_crop_size": 64,
+  "colormap": "jet",
+  "summary_png": "feature_vis_output/Task530_EsoTJ_30pct/BGHNetV4Trainer/fold_1/all_cases_summary_axial_crop64.png"
+}

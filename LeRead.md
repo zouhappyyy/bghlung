@@ -39,3 +39,27 @@ python step5_20240401_pred_test_lung_data.py
 python step5_20240511_pred_test_lung_data.py
 ```
 
+python tools/visualize_bghnetv4_all_stages.py \
+  --task Task530_EsoTJ_30pct \
+  --fold 1 \
+  --checkpoint ckpt/nnUNet/3d_fullres/Task530_EsoTJ_30pct/BGHNetV4Trainer__nnUNetPlansv2.1/fold_1/model_final_checkpoint.model \
+  --axis axial \
+  --output-dir feature_vis_output
+
+python tools/visualize_bghnetv4_all_stages.py \
+  --task Task530_EsoTJ_30pct \
+  --fold 1 \
+  --validation-raw-dir ckpt/nnUNet/3d_fullres/Task530_EsoTJ_30pct/BGHNetV4Trainer__nnUNetPlansv2.1/fold_1/validation_raw \
+  --all-cases \
+  --axis axial \
+  --display-crop-size 64 \
+  --output-dir feature_vis_output
+
+
+python tools/visualize_banetv2_all_stages.py \
+  --task Task530_EsoTJ_30pct \
+  --fold 1 \
+  --validation-raw-dir ckpt/nnUNet/3d_fullres/Task530_EsoTJ_30pct/BANetTrainerV2__nnUNetPlansv2.1/fold_1/validation_raw \
+  --axis axial \
+  --display-crop-size 64 \
+  --output-dir feature_vis_output

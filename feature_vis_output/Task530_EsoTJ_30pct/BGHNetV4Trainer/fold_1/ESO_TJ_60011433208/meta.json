@@ -1,0 +1,261 @@
+{
+  "task": "Task530_EsoTJ_30pct",
+  "fold": 1,
+  "case_id": "ESO_TJ_60011433208",
+  "checkpoint": "ckpt/nnUNet/3d_fullres/Task530_EsoTJ_30pct/BGHNetV4Trainer__nnUNetPlansv2.1/fold_1/model_final_checkpoint.model",
+  "validation_raw_dir": "ckpt/nnUNet/3d_fullres/Task530_EsoTJ_30pct/BGHNetV4Trainer__nnUNetPlansv2.1/fold_1/validation_raw",
+  "dataset_directory": "/home/fangzheng/zoule/ESO_nnUNet_dataset/nnUNet_preprocessed/Task530_EsoTJ_30pct",
+  "data_root": "/home/fangzheng/zoule/ESO_nnUNet_dataset/nnUNet_preprocessed/Task530_EsoTJ_30pct/nnUNetData_plans_v2.1_stage0",
+  "requested_case_id": null,
+  "resolved_case_id": "ESO_TJ_60011433208",
+  "auto_crop_enabled": true,
+  "crop_info": {
+    "original_shape": [
+      128,
+      128,
+      128
+    ],
+    "patch_size": [
+      80,
+      80,
+      80
+    ],
+    "crop_bbox_zyx": [
+      [
+        30,
+        110
+      ],
+      [
+        24,
+        104
+      ],
+      [
+        24,
+        104
+      ]
+    ],
+    "crop_center_zyx": [
+      70,
+      64,
+      64
+    ],
+    "cropped_shape_before_pad": [
+      80,
+      80,
+      80
+    ],
+    "pad_width_zyx": [
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        0
+      ]
+    ],
+    "final_patch_shape": [
+      80,
+      80,
+      80
+    ]
+  },
+  "axis": "axial",
+  "slice_index": 40,
+  "volume_shape": [
+    80,
+    80,
+    80
+  ],
+  "display_crop_size": 64,
+  "display_crop_info": {
+    "y_range": [
+      8,
+      72
+    ],
+    "x_range": [
+      8,
+      72
+    ],
+    "shape": [
+      64,
+      64
+    ]
+  },
+  "stage_tensor_shapes": {
+    "encoder_stage0": [
+      1,
+      24,
+      80,
+      80,
+      80
+    ],
+    "encoder_stage1": [
+      1,
+      48,
+      40,
+      40,
+      40
+    ],
+    "encoder_stage2": [
+      1,
+      96,
+      20,
+      20,
+      20
+    ],
+    "encoder_stage3": [
+      1,
+      192,
+      10,
+      10,
+      10
+    ],
+    "bottleneck": [
+      1,
+      312,
+      5,
+      5,
+      5
+    ],
+    "bdr_decoder_stage4": [
+      1,
+      312,
+      5,
+      5,
+      5
+    ],
+    "seg_decoder_stage4": [
+      1,
+      312,
+      5,
+      5,
+      5
+    ],
+    "bdr_decoder_stage3": [
+      1,
+      192,
+      10,
+      10,
+      10
+    ],
+    "seg_decoder_stage3": [
+      1,
+      192,
+      10,
+      10,
+      10
+    ],
+    "bdr_decoder_stage2": [
+      1,
+      96,
+      20,
+      20,
+      20
+    ],
+    "seg_decoder_stage2": [
+      1,
+      96,
+      20,
+      20,
+      20
+    ],
+    "bdr_decoder_stage1": [
+      1,
+      48,
+      40,
+      40,
+      40
+    ],
+    "seg_decoder_stage1": [
+      1,
+      48,
+      40,
+      40,
+      40
+    ],
+    "bdr_decoder_stage0": [
+      1,
+      24,
+      80,
+      80,
+      80
+    ],
+    "seg_decoder_stage0": [
+      1,
+      24,
+      80,
+      80,
+      80
+    ],
+    "seg_output_stage0": [
+      1,
+      2,
+      80,
+      80,
+      80
+    ],
+    "seg_output_stage1": [
+      1,
+      2,
+      40,
+      40,
+      40
+    ],
+    "seg_output_stage2": [
+      1,
+      2,
+      20,
+      20,
+      20
+    ],
+    "seg_output_stage3": [
+      1,
+      2,
+      10,
+      10,
+      10
+    ],
+    "bdr_output_stage0": [
+      1,
+      2,
+      80,
+      80,
+      80
+    ],
+    "bdr_output_stage1": [
+      1,
+      2,
+      40,
+      40,
+      40
+    ],
+    "bdr_output_stage2": [
+      1,
+      2,
+      20,
+      20,
+      20
+    ],
+    "bdr_output_stage3": [
+      1,
+      2,
+      10,
+      10,
+      10
+    ]
+  },
+  "saved_groups": [
+    "encoder",
+    "seg_decoder",
+    "bdr_decoder",
+    "seg_output",
+    "bdr_output",
+    "other"
+  ],
+  "colormap": "jet"
+}

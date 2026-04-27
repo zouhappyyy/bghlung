@@ -1,0 +1,297 @@
+{
+  "task": "Task530_EsoTJ_30pct",
+  "fold": 1,
+  "case_id": "ESO_TJ_60011222468",
+  "plans_file": "ckpt/nnUNet/3d_fullres/Task530_EsoTJ_30pct/BANetTrainerV2__nnUNetPlansv2.1/plans.pkl",
+  "output_folder": "ckpt/nnUNet/3d_fullres/Task530_EsoTJ_30pct/BANetTrainerV2__nnUNetPlansv2.1/fold_1",
+  "checkpoint": "ckpt/nnUNet/3d_fullres/Task530_EsoTJ_30pct/BANetTrainerV2__nnUNetPlansv2.1/fold_1/model_final_checkpoint.model",
+  "validation_raw_dir": "ckpt/nnUNet/3d_fullres/Task530_EsoTJ_30pct/BANetTrainerV2__nnUNetPlansv2.1/fold_1/validation_raw",
+  "dataset_directory": "/home/fangzheng/zoule/ESO_nnUNet_dataset/nnUNet_preprocessed/Task530_EsoTJ_30pct",
+  "data_root": "/home/fangzheng/zoule/ESO_nnUNet_dataset/nnUNet_preprocessed/Task530_EsoTJ_30pct/nnUNetData_plans_v2.1_stage0",
+  "requested_case_id": null,
+  "resolved_case_id": "ESO_TJ_60011222468",
+  "patch_size": [
+    128,
+    128,
+    128
+  ],
+  "auto_crop_enabled": true,
+  "crop_info": {
+    "original_shape": [
+      128,
+      128,
+      128
+    ],
+    "patch_size": [
+      128,
+      128,
+      128
+    ],
+    "crop_bbox_zyx": [
+      [
+        0,
+        128
+      ],
+      [
+        0,
+        128
+      ],
+      [
+        0,
+        128
+      ]
+    ],
+    "crop_center_zyx": [
+      62,
+      64,
+      64
+    ],
+    "cropped_shape_before_pad": [
+      128,
+      128,
+      128
+    ],
+    "pad_width_zyx": [
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        0
+      ]
+    ],
+    "final_patch_shape": [
+      128,
+      128,
+      128
+    ]
+  },
+  "axis": "axial",
+  "slice_index": 62,
+  "volume_shape": [
+    128,
+    128,
+    128
+  ],
+  "display_crop_size": 64,
+  "display_crop_info": {
+    "y_range": [
+      32,
+      96
+    ],
+    "x_range": [
+      32,
+      96
+    ],
+    "shape": [
+      64,
+      64
+    ]
+  },
+  "stage_tensor_shapes": {
+    "encoder_stage0": [
+      1,
+      32,
+      128,
+      128,
+      128
+    ],
+    "encoder_stage1": [
+      1,
+      64,
+      64,
+      64,
+      64
+    ],
+    "encoder_stage2": [
+      1,
+      128,
+      32,
+      32,
+      32
+    ],
+    "encoder_stage3": [
+      1,
+      256,
+      16,
+      16,
+      16
+    ],
+    "encoder_stage4": [
+      1,
+      320,
+      8,
+      8,
+      8
+    ],
+    "bottleneck": [
+      1,
+      320,
+      4,
+      4,
+      4
+    ],
+    "bdr_decoder_stage0": [
+      1,
+      320,
+      8,
+      8,
+      8
+    ],
+    "seg_decoder_stage0": [
+      1,
+      320,
+      8,
+      8,
+      8
+    ],
+    "bdr_decoder_stage1": [
+      1,
+      256,
+      16,
+      16,
+      16
+    ],
+    "seg_decoder_stage1": [
+      1,
+      256,
+      16,
+      16,
+      16
+    ],
+    "bdr_decoder_stage2": [
+      1,
+      128,
+      32,
+      32,
+      32
+    ],
+    "seg_decoder_stage2": [
+      1,
+      128,
+      32,
+      32,
+      32
+    ],
+    "bdr_decoder_stage3": [
+      1,
+      64,
+      64,
+      64,
+      64
+    ],
+    "seg_decoder_stage3": [
+      1,
+      64,
+      64,
+      64,
+      64
+    ],
+    "bdr_decoder_stage4": [
+      1,
+      32,
+      128,
+      128,
+      128
+    ],
+    "seg_decoder_stage4": [
+      1,
+      32,
+      128,
+      128,
+      128
+    ],
+    "seg_output_stage0": [
+      1,
+      2,
+      128,
+      128,
+      128
+    ],
+    "seg_output_stage1": [
+      1,
+      2,
+      64,
+      64,
+      64
+    ],
+    "seg_output_stage2": [
+      1,
+      2,
+      32,
+      32,
+      32
+    ],
+    "seg_output_stage3": [
+      1,
+      2,
+      16,
+      16,
+      16
+    ],
+    "seg_output_stage4": [
+      1,
+      2,
+      8,
+      8,
+      8
+    ],
+    "bdr_output_stage0": [
+      1,
+      2,
+      128,
+      128,
+      128
+    ],
+    "bdr_output_stage1": [
+      1,
+      2,
+      64,
+      64,
+      64
+    ],
+    "bdr_output_stage2": [
+      1,
+      2,
+      32,
+      32,
+      32
+    ],
+    "bdr_output_stage3": [
+      1,
+      2,
+      16,
+      16,
+      16
+    ],
+    "bdr_output_stage4": [
+      1,
+      2,
+      8,
+      8,
+      8
+    ]
+  },
+  "summary_stage_names": [
+    "encoder_stage0",
+    "bottleneck",
+    "seg_decoder_stage0",
+    "bdr_decoder_stage0",
+    "seg_output_stage0",
+    "bdr_output_stage0"
+  ],
+  "saved_groups": [
+    "encoder",
+    "seg_decoder",
+    "bdr_decoder",
+    "seg_output",
+    "bdr_output",
+    "other"
+  ],
+  "colormap": "jet"
+}
