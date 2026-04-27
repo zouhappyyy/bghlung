@@ -26,7 +26,6 @@ from __future__ import annotations
 
 import argparse
 import json
-import os
 from collections import OrderedDict
 from pathlib import Path
 from typing import Callable, Dict, List, Optional, Tuple
@@ -52,6 +51,18 @@ def _default_checkpoint(task: str, fold: int) -> Path:
         / "BGHNetV4Trainer__nnUNetPlansv2.1"
         / f"fold_{fold}"
         / "model_final_checkpoint.model"
+    )
+
+
+def _default_validation_raw_dir(task: str, fold: int) -> Path:
+    return (
+        Path("ckpt")
+        / "nnUNet"
+        / "3d_fullres"
+        / _default_task_dir(task)
+        / "BGHNetV4Trainer__nnUNetPlansv2.1"
+        / f"fold_{fold}"
+        / "validation_raw"
     )
 
 
@@ -81,6 +92,48 @@ def _resolve_case_npy(data_root: Path, case_id: Optional[str]) -> Path:
     if not files:
         raise RuntimeError(f"No .npy cases found under {data_root}")
     return files[0]
+
+
+def _load_validation_case_ids(validation_raw_dir: Path) -> List[str]:
+    summary_file = validation_raw_dir / "summary.json"
+    if not summary_file.is_file():
+        return []
+
+    try:
+        summary = json.loads(summary_file.read_text(encoding="utf-8"))
+    except Exception:
+        return []
+
+    case_ids: List[str] = []
+    for item in summary.get("results", {}).get("all", []):
+        test_path = item.get("test")
+        reference_path = item.get("reference")
+        chosen = test_path or reference_path
+        if not chosen:
+            continue
+
+        path_obj = Path(chosen)
+        name = path_obj.name
+        if name.endswith(".nii.gz"):
+            case_id = name[:-7]
+        else:
+            case_id = path_obj.stem
+        if case_id and case_id not in case_ids:
+            case_ids.append(case_id)
+    return case_ids
+
+
+def _resolve_case_id(case_id: Optional[str], validation_raw_dir: Path, data_root: Path) -> Optional[str]:
+    if case_id is not None:
+        return case_id
+
+    case_ids = _load_validation_case_ids(validation_raw_dir)
+    for candidate in case_ids:
+        npy_exact = data_root / f"{candidate}.npy"
+        npy_candidates = sorted(data_root.glob(f"{candidate}*.npy"))
+        if npy_exact.is_file() or npy_candidates:
+            return candidate
+    return None
 
 
 def _load_case_data(data_root: Path, dataset_dir: Path, case_id: Optional[str]) -> Tuple[str, np.ndarray, Optional[np.ndarray]]:
@@ -352,6 +405,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--task", default="Task530_EsoTJ_30pct")
     parser.add_argument("--fold", type=int, default=1)
     parser.add_argument("--checkpoint", default=None, help="Path to model_final_checkpoint.model")
+    parser.add_argument("--validation-raw-dir", default=None, help="validation_raw directory; summary.json is used to auto-pick validation cases")
     parser.add_argument("--dataset-directory", default=None, help="Task root that contains gt_segmentations")
     parser.add_argument("--data-root", default=None, help="Stage0 preprocessed .npy directory")
     parser.add_argument("--case-id", default=None, help="Case id without suffix; defaults to the first .npy case")
@@ -367,18 +421,23 @@ def main() -> None:
 
     task_dir = _default_task_dir(args.task)
     checkpoint = Path(args.checkpoint) if args.checkpoint else _default_checkpoint(args.task, args.fold)
+    validation_raw_dir = Path(args.validation_raw_dir) if args.validation_raw_dir else _default_validation_raw_dir(args.task, args.fold)
     dataset_dir = Path(args.dataset_directory) if args.dataset_directory else _default_dataset_dir(args.task)
     data_root = Path(args.data_root) if args.data_root else _default_stage0_dir(args.task)
+    resolved_case_id = _resolve_case_id(args.case_id, validation_raw_dir, data_root)
 
     print(f"[INFO] task={task_dir}")
     print(f"[INFO] checkpoint={checkpoint}")
+    print(f"[INFO] validation_raw_dir={validation_raw_dir}")
     print(f"[INFO] dataset_dir={dataset_dir}")
     print(f"[INFO] data_root={data_root}")
+    print(f"[INFO] requested_case_id={args.case_id}")
+    print(f"[INFO] resolved_case_id={resolved_case_id}")
 
     model = _build_model(args.device)
     _load_checkpoint(model, checkpoint, args.device)
 
-    case_name, data, seg = _load_case_data(data_root, dataset_dir, args.case_id)
+    case_name, data, seg = _load_case_data(data_root, dataset_dir, resolved_case_id)
     x = torch.from_numpy(data[None]).to(args.device)
 
     if x.shape != (1, 1, data.shape[1], data.shape[2], data.shape[3]):
@@ -446,8 +505,11 @@ def main() -> None:
         "fold": args.fold,
         "case_id": case_name,
         "checkpoint": str(checkpoint),
+        "validation_raw_dir": str(validation_raw_dir),
         "dataset_directory": str(dataset_dir),
         "data_root": str(data_root),
+        "requested_case_id": args.case_id,
+        "resolved_case_id": resolved_case_id,
         "axis": args.axis,
         "slice_index": slice_index,
         "volume_shape": list(volume_shape),
