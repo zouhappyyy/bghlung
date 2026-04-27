@@ -238,8 +238,6 @@ def save_outputs(
     )
     stem = f"{checkpoint_name}_{backend}_{layer_name.replace('.', '_')}"
 
-    np.save(outdir / f"{stem}.npy", heatmap_resized)
-
     axial_idx = slices["axial"]
     plot_single_view_overlay(
         data[0, 0, axial_idx],

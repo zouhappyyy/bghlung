@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+﻿#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """nnUNetTrainerV2 first skip connection feature visualization tool.
 
@@ -15,7 +15,6 @@ Features:
 - Detailed metadata logging
 
 Outputs:
-- heatmap .npy (resized to original volume dimensions)
 - multi-view overlay .png (all three views)
 - single-view overlay .png (axial view)
 - meta .json (metadata and configuration)
@@ -88,7 +87,7 @@ def load_checkpoint_if_available(trainer, checkpoint_path: Optional[str]) -> Non
         raise FileNotFoundError(f"Checkpoint not found: {ckpt}")
     state = torch.load(str(ckpt), map_location=torch.device("cpu"))
     trainer.network.load_state_dict(state["state_dict"], strict=False)
-    print(f"✓ Loaded checkpoint: {ckpt}")
+    print(f"鉁?Loaded checkpoint: {ckpt}")
 
 
 def choose_case_file(validation_raw_dir: Path, case_id: Optional[str]) -> Path:
@@ -159,7 +158,7 @@ def _first_module_from_container(container: torch.nn.Module) -> Tuple[str, torch
     if isinstance(container, torch.nn.ModuleList):
         if len(container) == 0:
             raise RuntimeError("conv_blocks_localization is empty")
-        idx = len(container) - 1  # ✅ 取最后一个
+        idx = len(container) - 1  # 鉁?鍙栨渶鍚庝竴涓?
         return str(idx), container[idx]
 
     if isinstance(container, torch.nn.Sequential):
@@ -172,7 +171,7 @@ def _first_module_from_container(container: torch.nn.Module) -> Tuple[str, torch
         children = list(container.named_children())
         if not children:
             raise RuntimeError("No children in localization container")
-        return children[-1]  # ✅ 最后一个
+        return children[-1]  # 鉁?鏈€鍚庝竴涓?
     raise RuntimeError(f"Unsupported localization container type: {type(container).__name__}")
 
 
@@ -188,12 +187,12 @@ def find_first_skip_connection(network: torch.nn.Module) -> Tuple[str, torch.nn.
         container = getattr(net, "conv_blocks_localization")
         child_name, child = _first_module_from_container(container)
         full_name = f"conv_blocks_localization.{child_name}"
-        print(f"✓ Found first skip layer: {full_name}")
+        print(f"鉁?Found first skip layer: {full_name}")
         return full_name, child
 
     for name, module in net.named_modules():
         if "conv_blocks_localization" in name and name.split(".")[-1].isdigit():
-            print(f"✓ Found first skip layer (fallback): {name}")
+            print(f"鉁?Found first skip layer (fallback): {name}")
             return name, module
 
     raise RuntimeError("Could not find first skip connection layer in network")
@@ -254,8 +253,8 @@ def make_heatmap(
         (D, H, W) normalized heatmap as numpy array
     """
     if backend == "activation":
-        # Channel-average absolute activation
-        cam = feature_map.abs().mean(dim=1, keepdim=False)
+        # Channel-wise max preserves sparse high-response regions.
+        cam = feature_map.abs().max(dim=1, keepdim=False).values
     elif backend == "gradcam":
         if grad is None:
             raise RuntimeError("Grad-CAM requires gradients")
@@ -344,7 +343,7 @@ def plot_single_view_overlay(
     plt.tight_layout()
     plt.savefig(out_png, dpi=300, bbox_inches="tight")
     plt.close(fig)
-    print(f"✓ Saved single-view overlay: {out_png}")
+    print(f"鉁?Saved single-view overlay: {out_png}")
 
 
 def plot_multi_view_overlay(
@@ -380,7 +379,7 @@ def plot_multi_view_overlay(
     plt.tight_layout()
     plt.savefig(out_png, dpi=300, bbox_inches="tight")
     plt.close(fig)
-    print(f"✓ Saved multi-view overlay: {out_png}")
+    print(f"鉁?Saved multi-view overlay: {out_png}")
 
 
 # ============================================================================
@@ -446,7 +445,7 @@ def main() -> None:
     load_checkpoint_if_available(trainer, checkpoint)
     trainer.network.eval()
 
-    print(f"✓ Initialized {TRAINER_NAME}")
+    print(f"鉁?Initialized {TRAINER_NAME}")
 
     if args.print_structure:
         print(f"\nNetwork structure:")
@@ -460,13 +459,13 @@ def main() -> None:
     # ========================================================================
 
     case_file = choose_case_file(Path(validation_raw_dir), args.case_id)
-    print(f"✓ Selected case: {case_file.stem}")
+    print(f"鉁?Selected case: {case_file.stem}")
 
     expected_in = getattr(trainer.network, "num_input_channels", None)
     data, target = load_case_npz(case_file, expected_in)
-    print(f"✓ Loaded data shape: {data.shape}")
+    print(f"鉁?Loaded data shape: {data.shape}")
     if target is not None:
-        print(f"✓ Target shape: {target.shape}")
+        print(f"鉁?Target shape: {target.shape}")
 
     x = torch.from_numpy(data).float().to(args.device)
     if args.backend == "gradcam":
@@ -480,7 +479,7 @@ def main() -> None:
     logits, feat_map, layer_name = extract_skip_connection_features(trainer.network, x, args.backend)
 
     feat_np = feat_map.detach().cpu().numpy()
-    print(f"✓ Feature layer: {layer_name}")
+    print(f"鉁?Feature layer: {layer_name}")
     print(f"  Feature shape:    {tuple(feat_np.shape)}")
     print(f"  Feature min:      {feat_np.min():.6g}")
     print(f"  Feature max:      {feat_np.max():.6g}")
@@ -555,10 +554,6 @@ def main() -> None:
 
     stem = f"{case_file.stem}_{args.backend}_first_skip"
 
-    # Save heatmap
-    np.save(outdir / f"{stem}.npy", heatmap_resized)
-    print(f"✓ Saved: {outdir / f'{stem}.npy'}")
-
     # Save single-view overlay (axial)
     axial_idx = slices["axial"]
     image_slice = data[0, 0, axial_idx]
@@ -593,13 +588,14 @@ def main() -> None:
         "heatmap_shape": list(heatmap_resized.shape),
     }
     (outdir / f"{stem}.json").write_text(json.dumps(meta, ensure_ascii=False, indent=2), encoding="utf-8")
-    print(f"✓ Saved: {outdir / f'{stem}.json'}")
+    print(f"鉁?Saved: {outdir / f'{stem}.json'}")
 
     print(f"\n{'='*70}")
-    print(f"✓ Visualization complete!")
+    print(f"鉁?Visualization complete!")
     print(f"  Output directory: {outdir}")
     print(f"{'='*70}\n")
 
 
 if __name__ == "__main__":
     main()
+
