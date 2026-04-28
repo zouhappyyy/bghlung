@@ -1,8 +1,11 @@
 #!/usr/bin/env python3
-"""Analyze frequency-spectrum changes across nnUNet encoder stages.
+"""Analyze frequency-spectrum changes across model encoder stages.
 
 This script compares the input spectrum with the spectra after the first two
-nnUNet encoder stages (`conv_blocks_context[0]` and `conv_blocks_context[1]`).
+encoder stages of a supported segmentation model. It currently supports:
+- `nnUNetTrainerV2`: `conv_blocks_context[0]`, `conv_blocks_context[1]`
+- `MedNeXtTrainerV2`: `enc_block_0`, `enc_block_1`
+
 It is designed for Task530_EsoTJ_30pct and defaults to the paths provided for
 the nnUNet baseline model, while still allowing custom paths via CLI flags.
 
@@ -32,33 +35,60 @@ import torch.nn.functional as F
 from nnunet.training.model_restore import restore_model
 
 
-DEFAULT_FOLD_DIR = Path(
-    "ckpt/nnUNet/3d_fullres/Task530_EsoTJ_30pct/"
-    "nnUNetTrainerV2__nnUNetPlansv2.1/fold_1"
-)
+MODEL_CONFIGS = {
+    "nnUNetTrainerV2": {
+        "trainer_module": "nnunet.training.network_training.nnUNetTrainerV2",
+        "trainer_class": "nnUNetTrainerV2",
+        "default_fold_dir": Path(
+            "ckpt/nnUNet/3d_fullres/Task530_EsoTJ_30pct/"
+            "nnUNetTrainerV2__nnUNetPlansv2.1/fold_1"
+        ),
+        "default_output_dir": Path(
+            "feature_vis_output/frequency_spectrum/Task530_EsoTJ_30pct/nnUNetTrainerV2/fold_1"
+        ),
+        "layers": (
+            ("encoder_stage_0", "conv_blocks_context", 0, "Encoder Stage 0"),
+            ("encoder_stage_1", "conv_blocks_context", 1, "Encoder Stage 1"),
+        ),
+    },
+    "MedNeXtTrainerV2": {
+        "trainer_module": "nnunet.training.network_training.MedNeXt.MedNeXtTrainerV2",
+        "trainer_class": "MedNeXtTrainerV2",
+        "default_fold_dir": Path(
+            "ckpt/nnUNet/3d_fullres/Task530_EsoTJ_30pct/"
+            "MedNeXtTrainerV2__nnUNetPlansv2.1/fold_2"
+        ),
+        "default_output_dir": Path(
+            "feature_vis_output/frequency_spectrum/Task530_EsoTJ_30pct/MedNeXtTrainerV2/fold_2"
+        ),
+        "layers": (
+            ("encoder_stage_0", "enc_block_0", None, "Encoder Stage 0"),
+            ("encoder_stage_1", "enc_block_1", None, "Encoder Stage 1"),
+        ),
+    },
+}
 DEFAULT_DATA_DIR = Path(
     "/home/fangzheng/zoule/ESO_nnUNet_dataset/nnUNet_preprocessed/"
     "Task530_EsoTJ_30pct/nnUNetData2D_plans_v2.1_trgSp_1x1x1_stage0"
 )
-DEFAULT_OUTPUT_DIR = Path(
-    "feature_vis_output/frequency_spectrum/Task530_EsoTJ_30pct/nnUNetTrainerV2/fold_1"
-)
 LAYER_ORDER = ("input", "encoder_stage_0", "encoder_stage_1")
-LAYER_TITLES = {
-    "input": "Input",
-    "encoder_stage_0": "Encoder Stage 0",
-    "encoder_stage_1": "Encoder Stage 1",
-}
+LAYER_TITLES_BASE = {"input": "Input"}
 RADIAL_CACHE: Dict[Tuple[int, int, int], np.ndarray] = {}
 
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Analyze 3D frequency-spectrum changes for nnUNet encoder stages."
+        description="Analyze 3D frequency-spectrum changes for the first two encoder stages."
     )
-    parser.add_argument("--fold-dir", default=str(DEFAULT_FOLD_DIR), help="Fold directory containing checkpoint files.")
+    parser.add_argument(
+        "--trainer",
+        choices=sorted(MODEL_CONFIGS.keys()),
+        default="nnUNetTrainerV2",
+        help="Trainer/model family to analyze.",
+    )
+    parser.add_argument("--fold-dir", default=None, help="Fold directory containing checkpoint files.")
     parser.add_argument("--data-dir", default=str(DEFAULT_DATA_DIR), help="Directory containing preprocessed .npz cases.")
-    parser.add_argument("--output-dir", default=str(DEFAULT_OUTPUT_DIR), help="Directory to save outputs.")
+    parser.add_argument("--output-dir", default=None, help="Directory to save outputs.")
     parser.add_argument(
         "--checkpoint-name",
         default="model_final_checkpoint",
@@ -74,7 +104,7 @@ def parse_args() -> argparse.Namespace:
         default=None,
         help="Optional plans.pkl path used only when checkpoint .pkl metadata is unavailable.",
     )
-    parser.add_argument("--fold", type=int, default=1, help="Fold index used by the trainer fallback path.")
+    parser.add_argument("--fold", type=int, default=None, help="Fold index used by the trainer fallback path.")
     parser.add_argument("--case-id", default=None, help="Analyze a single case id only.")
     parser.add_argument("--max-cases", type=int, default=None, help="Limit the number of analyzed cases.")
     parser.add_argument("--num-bins", type=int, default=96, help="Number of radial frequency bins.")
@@ -108,6 +138,15 @@ def resolve_checkpoint_path(fold_dir: Path, checkpoint_name: str, checkpoint: Op
     if checkpoint is not None:
         return Path(checkpoint)
     return fold_dir / f"{checkpoint_name}.model"
+
+
+def infer_fold_from_dir(fold_dir: Path, fallback: int = 0) -> int:
+    name = fold_dir.name
+    if name.startswith("fold_"):
+        suffix = name.split("_", 1)[1]
+        if suffix.isdigit():
+            return int(suffix)
+    return fallback
 
 
 def find_case_files(data_dir: Path, case_id: Optional[str], max_cases: Optional[int]) -> List[Path]:
@@ -145,6 +184,7 @@ def load_case_npz(case_file: Path, expected_in: Optional[int]) -> np.ndarray:
 
 
 def restore_trainer(
+    trainer_name: str,
     fold_dir: Path,
     checkpoint_path: Path,
     plans_file: Optional[str],
@@ -164,9 +204,11 @@ def restore_trainer(
                 "Could not restore trainer: checkpoint metadata .pkl is missing and no valid plans.pkl was found. "
                 f"Checked checkpoint companion '{companion_pkl}' and plans '{plans_path}'."
             )
-        from nnunet.training.network_training.nnUNetTrainerV2 import nnUNetTrainerV2
 
-        trainer = nnUNetTrainerV2(
+        config = MODEL_CONFIGS[trainer_name]
+        trainer_module = __import__(config["trainer_module"], fromlist=[config["trainer_class"]])
+        TrainerClass = getattr(trainer_module, config["trainer_class"])
+        trainer = TrainerClass(
             str(plans_path),
             fold,
             output_folder=str(fold_dir),
@@ -186,23 +228,36 @@ def unwrap_module(module: torch.nn.Module) -> torch.nn.Module:
     return module.module if hasattr(module, "module") else module
 
 
-def get_encoder_modules(network: torch.nn.Module) -> List[Tuple[str, torch.nn.Module]]:
+def get_layer_titles(trainer_name: str) -> Dict[str, str]:
+    titles = dict(LAYER_TITLES_BASE)
+    for layer_key, _attr_name, _index, title in MODEL_CONFIGS[trainer_name]["layers"]:
+        titles[layer_key] = title
+    return titles
+
+
+def get_encoder_modules(trainer_name: str, network: torch.nn.Module) -> List[Tuple[str, torch.nn.Module]]:
     base = unwrap_module(network)
-    if not hasattr(base, "conv_blocks_context"):
-        raise RuntimeError("The loaded network has no attribute 'conv_blocks_context'.")
-    blocks = getattr(base, "conv_blocks_context")
-    if len(blocks) < 2:
-        raise RuntimeError(f"Expected at least 2 encoder stages, got {len(blocks)}")
-    return [
-        ("encoder_stage_0", blocks[0]),
-        ("encoder_stage_1", blocks[1]),
-    ]
+    modules: List[Tuple[str, torch.nn.Module]] = []
+    for layer_key, attr_name, attr_index, _title in MODEL_CONFIGS[trainer_name]["layers"]:
+        if not hasattr(base, attr_name):
+            raise RuntimeError(
+                f"The loaded {trainer_name} network has no attribute '{attr_name}'."
+            )
+        target = getattr(base, attr_name)
+        if attr_index is not None:
+            if len(target) <= attr_index:
+                raise RuntimeError(
+                    f"Expected at least {attr_index + 1} elements in '{attr_name}', got {len(target)}"
+                )
+            target = target[attr_index]
+        modules.append((layer_key, target))
+    return modules
 
 
-def collect_stage_outputs(network: torch.nn.Module, x: torch.Tensor) -> Dict[str, torch.Tensor]:
+def collect_stage_outputs(trainer_name: str, network: torch.nn.Module, x: torch.Tensor) -> Dict[str, torch.Tensor]:
     captured: Dict[str, torch.Tensor] = {}
     handles = []
-    for name, module in get_encoder_modules(network):
+    for name, module in get_encoder_modules(trainer_name, network):
         handles.append(
             module.register_forward_hook(
                 lambda _module, _inputs, output, layer_name=name: captured.__setitem__(
@@ -377,7 +432,11 @@ class LayerAccumulator:
         }
 
 
-def plot_mean_spectrum_slices(layer_summaries: Dict[str, Dict[str, object]], output_path: Path) -> None:
+def plot_mean_spectrum_slices(
+    layer_summaries: Dict[str, Dict[str, object]],
+    layer_titles: Dict[str, str],
+    output_path: Path,
+) -> None:
     fig, axes = plt.subplots(3, len(LAYER_ORDER), figsize=(5 * len(LAYER_ORDER), 12))
     for col, layer_name in enumerate(LAYER_ORDER):
         mean_spectrum = layer_summaries[layer_name]["mean_resized_spectrum"]
@@ -388,7 +447,7 @@ def plot_mean_spectrum_slices(layer_summaries: Dict[str, Dict[str, object]], out
             ax.imshow(slices[axis_name], cmap="magma", interpolation="nearest")
             if row == 0:
                 ax.set_title(
-                    f"{LAYER_TITLES[layer_name]}\n{axis_name} | High={high_ratio:.4f} ({high_ratio * 100:.2f}%)"
+                    f"{layer_titles[layer_name]}\n{axis_name} | High={high_ratio:.4f} ({high_ratio * 100:.2f}%)"
                 )
             else:
                 ax.set_title(f"{axis_name} | High={high_ratio:.4f} ({high_ratio * 100:.2f}%)")
@@ -399,7 +458,11 @@ def plot_mean_spectrum_slices(layer_summaries: Dict[str, Dict[str, object]], out
     plt.close(fig)
 
 
-def plot_radial_profiles(layer_summaries: Dict[str, Dict[str, object]], output_path: Path) -> None:
+def plot_radial_profiles(
+    layer_summaries: Dict[str, Dict[str, object]],
+    layer_titles: Dict[str, str],
+    output_path: Path,
+) -> None:
     fig, ax = plt.subplots(1, 1, figsize=(9, 5))
     radius = np.linspace(0.0, 1.0, len(next(iter(layer_summaries.values()))["mean_radial_profile"]))
     for layer_name in LAYER_ORDER:
@@ -409,7 +472,7 @@ def plot_radial_profiles(layer_summaries: Dict[str, Dict[str, object]], output_p
             radius,
             profile,
             linewidth=2.0,
-            label=f"{LAYER_TITLES[layer_name]} | High={high_ratio:.4f} ({high_ratio * 100:.2f}%)",
+            label=f"{layer_titles[layer_name]} | High={high_ratio:.4f} ({high_ratio * 100:.2f}%)",
         )
     ax.set_xlabel("Normalized Radius")
     ax.set_ylabel("Mean Normalized Spectral Energy")
@@ -421,7 +484,11 @@ def plot_radial_profiles(layer_summaries: Dict[str, Dict[str, object]], output_p
     plt.close(fig)
 
 
-def plot_band_energy_ratios(layer_summaries: Dict[str, Dict[str, object]], output_path: Path) -> None:
+def plot_band_energy_ratios(
+    layer_summaries: Dict[str, Dict[str, object]],
+    layer_titles: Dict[str, str],
+    output_path: Path,
+) -> None:
     labels = ["low", "mid", "high"]
     x = np.arange(len(labels))
     width = 0.22
@@ -430,7 +497,7 @@ def plot_band_energy_ratios(layer_summaries: Dict[str, Dict[str, object]], outpu
     for idx, layer_name in enumerate(LAYER_ORDER):
         ratios = layer_summaries[layer_name]["band_energy_ratio_mean"]
         values = [ratios[label] for label in labels]
-        bars = ax.bar(x + idx * width - width, values, width=width, label=LAYER_TITLES[layer_name])
+        bars = ax.bar(x + idx * width - width, values, width=width, label=layer_titles[layer_name])
         for bar, value in zip(bars, values):
             ax.text(
                 bar.get_x() + bar.get_width() / 2.0,
@@ -492,23 +559,28 @@ def write_radial_profiles_csv(layer_summaries: Dict[str, Dict[str, object]], out
             )
 
 
-def write_high_frequency_summary_csv(layer_summaries: Dict[str, Dict[str, object]], output_path: Path) -> None:
+def write_high_frequency_summary_csv(
+    layer_summaries: Dict[str, Dict[str, object]],
+    layer_titles: Dict[str, str],
+    output_path: Path,
+) -> None:
     with output_path.open("w", newline="", encoding="utf-8") as handle:
         writer = csv.writer(handle)
-        writer.writerow(["layer", "high_freq_ratio", "high_freq_percent"])
+        writer.writerow(["layer", "layer_title", "high_freq_ratio", "high_freq_percent"])
         for layer_name in LAYER_ORDER:
             high_ratio = float(layer_summaries[layer_name]["band_energy_ratio_mean"]["high"])
-            writer.writerow([layer_name, f"{high_ratio:.10f}", f"{high_ratio * 100:.4f}"])
+            writer.writerow([layer_name, layer_titles[layer_name], f"{high_ratio:.10f}", f"{high_ratio * 100:.4f}"])
 
 
 def print_run_header(args: argparse.Namespace, checkpoint_path: Path, case_files: Iterable[Path]) -> None:
     print("=" * 72)
-    print("nnUNet Encoder Frequency Spectrum Analysis")
+    print(f"{args.trainer} Encoder Frequency Spectrum Analysis")
     print("=" * 72)
-    print(f"Fold dir:           {Path(args.fold_dir)}")
+    print(f"Fold dir:           {checkpoint_path.parent}")
     print(f"Checkpoint:         {checkpoint_path}")
     print(f"Data dir:           {Path(args.data_dir)}")
-    print(f"Output dir:         {Path(args.output_dir)}")
+    resolved_output_dir = Path(args.output_dir) if args.output_dir is not None else MODEL_CONFIGS[args.trainer]["default_output_dir"]
+    print(f"Output dir:         {resolved_output_dir}")
     print(f"Device:             {args.device}")
     print(f"Remove DC:          {args.remove_dc}")
     print(f"Radial bins:        {args.num_bins}")
@@ -519,10 +591,13 @@ def print_run_header(args: argparse.Namespace, checkpoint_path: Path, case_files
 
 def main() -> None:
     args = parse_args()
-    fold_dir = Path(args.fold_dir)
+    config = MODEL_CONFIGS[args.trainer]
+    fold_dir = Path(args.fold_dir) if args.fold_dir is not None else config["default_fold_dir"]
     data_dir = Path(args.data_dir)
-    output_dir = Path(args.output_dir)
+    output_dir = Path(args.output_dir) if args.output_dir is not None else config["default_output_dir"]
     output_dir.mkdir(parents=True, exist_ok=True)
+    layer_titles = get_layer_titles(args.trainer)
+    fold = args.fold if args.fold is not None else infer_fold_from_dir(fold_dir)
 
     checkpoint_path = resolve_checkpoint_path(fold_dir, args.checkpoint_name, args.checkpoint)
     if not checkpoint_path.is_file():
@@ -532,11 +607,12 @@ def main() -> None:
     print_run_header(args, checkpoint_path, case_files)
 
     trainer = restore_trainer(
+        trainer_name=args.trainer,
         fold_dir=fold_dir,
         checkpoint_path=checkpoint_path,
         plans_file=args.plans_file,
         data_dir=data_dir,
-        fold=args.fold,
+        fold=fold,
     )
     device = torch.device(args.device)
     trainer.network.to(device)
@@ -557,7 +633,7 @@ def main() -> None:
     for idx, case_file in enumerate(case_files, start=1):
         data = load_case_npz(case_file, expected_in=expected_in)
         x = torch.from_numpy(data).to(device=device, dtype=torch.float32)
-        outputs = collect_stage_outputs(trainer.network, x)
+        outputs = collect_stage_outputs(args.trainer, trainer.network, x)
 
         print(f"[{idx:03d}/{len(case_files):03d}] {case_file.stem}")
         for layer_name in LAYER_ORDER:
@@ -588,7 +664,8 @@ def main() -> None:
             "checkpoint": str(checkpoint_path),
             "data_dir": str(data_dir),
             "output_dir": str(output_dir),
-            "fold": args.fold,
+            "trainer": args.trainer,
+            "fold": fold,
             "num_cases": len(case_files),
             "num_bins": args.num_bins,
             "spectrum_grid_size": args.spectrum_grid_size,
@@ -609,10 +686,10 @@ def main() -> None:
 
     write_case_metrics_csv(case_metric_rows, output_dir / "case_metrics.csv")
     write_radial_profiles_csv(layer_summaries, output_dir / "radial_profiles.csv")
-    write_high_frequency_summary_csv(layer_summaries, output_dir / "high_frequency_summary.csv")
-    plot_mean_spectrum_slices(layer_summaries, output_dir / "mean_spectrum_slices.png")
-    plot_radial_profiles(layer_summaries, output_dir / "radial_profiles.png")
-    plot_band_energy_ratios(layer_summaries, output_dir / "band_energy_ratios.png")
+    write_high_frequency_summary_csv(layer_summaries, layer_titles, output_dir / "high_frequency_summary.csv")
+    plot_mean_spectrum_slices(layer_summaries, layer_titles, output_dir / "mean_spectrum_slices.png")
+    plot_radial_profiles(layer_summaries, layer_titles, output_dir / "radial_profiles.png")
+    plot_band_energy_ratios(layer_summaries, layer_titles, output_dir / "band_energy_ratios.png")
 
     with (output_dir / "summary.json").open("w", encoding="utf-8") as handle:
         json.dump(summary_json, handle, indent=2, ensure_ascii=False)
@@ -620,7 +697,7 @@ def main() -> None:
     print("\nHigh-frequency ratios:")
     for layer_name in LAYER_ORDER:
         high_ratio = float(layer_summaries[layer_name]["band_energy_ratio_mean"]["high"])
-        print(f"  - {LAYER_TITLES[layer_name]}: {high_ratio:.6f} ({high_ratio * 100:.2f}%)")
+        print(f"  - {layer_titles[layer_name]}: {high_ratio:.6f} ({high_ratio * 100:.2f}%)")
 
     print("\nSaved outputs:")
     for name in (
