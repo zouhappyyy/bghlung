@@ -29,6 +29,7 @@ from pathlib import Path
 from typing import Dict, Optional, Tuple
 
 import matplotlib.pyplot as plt
+import nibabel as nib
 import numpy as np
 import torch
 import torch.nn.functional as F
@@ -76,6 +77,10 @@ def default_dataset_directory(task: str) -> Path:
     if preprocessing_output_dir is None:
         raise RuntimeError("nnUNet preprocessing_output_dir is not configured in nnunet.paths")
     return Path(preprocessing_output_dir) / default_task_dir(task)
+
+
+def default_gt_directory(task: str) -> Path:
+    return default_dataset_directory(task) / "gt_segmentations"
 
 
 def default_validation_raw_dir(fold: int) -> Path:
@@ -129,6 +134,40 @@ def load_case_npz(case_file: Path, expected_in: Optional[int]) -> Tuple[np.ndarr
         if target.ndim != 3:
             raise RuntimeError(f"Expected target to be 3D, got {target.shape} from {case_file}")
     return data.astype(np.float32), None if target is None else target.astype(np.int64)
+
+
+def load_target_from_gt_dir(
+    gt_directory: Optional[Path],
+    case_id: str,
+    expected_shape: Optional[Tuple[int, int, int]] = None,
+) -> Optional[np.ndarray]:
+    if gt_directory is None:
+        return None
+
+    gt_path = gt_directory / f"{case_id}.nii.gz"
+    if not gt_path.is_file():
+        return None
+
+    target = np.asarray(nib.load(str(gt_path)).get_fdata(), dtype=np.int64)
+    if target.ndim != 3:
+        raise RuntimeError(f"Expected GT to be 3D, got {target.shape} from {gt_path}")
+    if expected_shape is not None and tuple(target.shape) != tuple(expected_shape):
+        raise RuntimeError(
+            f"GT shape mismatch for {case_id}: got {target.shape}, expected {expected_shape} from data volume"
+        )
+    return target
+
+
+def resolve_target(
+    case_id: str,
+    npz_target: Optional[np.ndarray],
+    gt_directory: Optional[Path],
+    expected_shape: Tuple[int, int, int],
+) -> Optional[np.ndarray]:
+    gt_target = load_target_from_gt_dir(gt_directory, case_id, expected_shape=expected_shape)
+    if gt_target is not None:
+        return gt_target
+    return npz_target
 
 
 def _backward_target_from_logits(logits: torch.Tensor) -> torch.Tensor:
@@ -303,10 +342,39 @@ def resolve_heatmap_imshow_kwargs(heatmap: np.ndarray) -> Dict[str, float | str]
     }
 
 
+def resolve_logits_imshow_kwargs(logits_slice: np.ndarray) -> Dict[str, float | str]:
+    max_abs = float(np.max(np.abs(logits_slice))) if logits_slice.size else 1.0
+    if max_abs <= 0:
+        max_abs = 1.0
+    return {
+        "cmap": "coolwarm",
+        "vmin": -max_abs,
+        "vmax": max_abs,
+        "interpolation": "bilinear",
+    }
+
+
 def resize_to_original(arr: np.ndarray, target_shape: Tuple[int, int, int]) -> np.ndarray:
     """Resize heatmap to original volume dimensions using nearest neighbor."""
     t = torch.from_numpy(arr[None, None].astype(np.float32))
     t = F.interpolate(t, size=target_shape, mode="nearest")
+    return t[0, 0].cpu().numpy()
+
+
+def logits_to_volume(logits: torch.Tensor) -> np.ndarray:
+    """Extract the foreground-class logits volume from network output."""
+    if isinstance(logits, (tuple, list)):
+        logits = logits[0]
+    if logits.dim() != 5:
+        raise RuntimeError(f"Expected 5D logits tensor, got {tuple(logits.shape)}")
+    target_channel = 1 if logits.shape[1] > 1 else 0
+    return logits[0, target_channel].detach().cpu().numpy().astype(np.float32)
+
+
+def resize_logits_to_original(arr: np.ndarray, target_shape: Tuple[int, int, int]) -> np.ndarray:
+    """Resize logits volume to original dimensions using trilinear interpolation."""
+    t = torch.from_numpy(arr[None, None].astype(np.float32))
+    t = F.interpolate(t, size=target_shape, mode="trilinear", align_corners=False)
     return t[0, 0].cpu().numpy()
 
 
@@ -430,6 +498,23 @@ def plot_image_and_target(
     print(f"Saved image/target figure: {out_png}")
 
 
+def plot_logits_slice(
+    logits_slice: np.ndarray,
+    out_png: Path,
+    title: str,
+) -> None:
+    """Plot a standalone logits slice."""
+    fig, ax = plt.subplots(1, 1, figsize=(6, 5))
+    ax.imshow(logits_slice, **resolve_logits_imshow_kwargs(logits_slice))
+    ax.set_title("Foreground Logits")
+    ax.axis("off")
+    fig.suptitle(title, fontsize=12, fontweight="bold")
+    plt.tight_layout()
+    plt.savefig(out_png, dpi=300, bbox_inches="tight")
+    plt.close(fig)
+    print(f"Saved logits figure: {out_png}")
+
+
 def plot_multi_view_overlay(
     data: np.ndarray,
     heatmap: np.ndarray,
@@ -493,6 +578,7 @@ def main() -> None:
                         help="Output directory")
     parser.add_argument("--checkpoint", default=None, help="Custom checkpoint path")
     parser.add_argument("--dataset-directory", default=None, help="Custom dataset directory")
+    parser.add_argument("--gt-directory", default=None, help="Directory containing GT .nii.gz files")
     parser.add_argument("--plans-file", default=None, help="Custom plans file")
     parser.add_argument("--device", default="cuda" if torch.cuda.is_available() else "cpu",
                         help="Device to use")
@@ -509,6 +595,7 @@ def main() -> None:
 
     plans_file = args.plans_file or str(default_plans_path())
     dataset_directory = args.dataset_directory or str(default_dataset_directory(TASK))
+    gt_directory = Path(args.gt_directory) if args.gt_directory else default_gt_directory(TASK)
     output_folder = str(CKPT_BASE / f"fold_{args.fold}")
     checkpoint = args.checkpoint or str(default_checkpoint_path(args.fold))
     validation_raw_dir = str(default_validation_raw_dir(args.fold))
@@ -525,6 +612,7 @@ def main() -> None:
     print(f"Checkpoint:         {checkpoint}")
     print(f"Plans file:         {plans_file}")
     print(f"Dataset directory:  {dataset_directory}")
+    print(f"GT directory:       {gt_directory}")
     print(f"Validation raw dir: {validation_raw_dir}")
     print(f"{'='*70}\n")
 
@@ -558,7 +646,13 @@ def main() -> None:
     print(f"鉁?Selected case: {case_file.stem}")
 
     expected_in = getattr(trainer.network, "num_input_channels", None)
-    data, target = load_case_npz(case_file, expected_in)
+    data, npz_target = load_case_npz(case_file, expected_in)
+    target = resolve_target(
+        case_file.stem,
+        npz_target,
+        gt_directory,
+        expected_shape=(int(data.shape[2]), int(data.shape[3]), int(data.shape[4])),
+    )
     print(f"鉁?Loaded data shape: {data.shape}")
     if target is not None:
         print(f"鉁?Target shape: {target.shape}")
@@ -637,6 +731,7 @@ def main() -> None:
 
     original_shape = (int(data.shape[2]), int(data.shape[3]), int(data.shape[4]))
     heatmap_resized = resize_to_original(heatmap, original_shape)
+    logits_resized = resize_logits_to_original(logits_to_volume(logits), original_shape)
     slices = pick_middle_slices(original_shape)
 
     print(f"\nResized heatmap to original shape: {tuple(heatmap_resized.shape)}")
@@ -655,11 +750,17 @@ def main() -> None:
     image_slice = data[0, 0, axial_idx]
     heat_slice = heatmap_resized[axial_idx]
     target_slice = None if target is None else target[axial_idx]
+    logits_slice = logits_resized[axial_idx]
     plot_image_and_target(
         image_slice,
         outdir / f"{stem}_image_target.png",
         f"{TASK} | {TRAINER_NAME} | {case_file.stem} | Axial Image + Target",
         target_slice,
+    )
+    plot_logits_slice(
+        logits_slice,
+        outdir / f"{stem}_logits.png",
+        f"{TASK} | {TRAINER_NAME} | {case_file.stem} | Foreground Logits",
     )
     plot_single_view_overlay(
         image_slice, heat_slice,
@@ -692,6 +793,7 @@ def main() -> None:
         "original_shape": original_shape,
         "feature_shape": list(feat_np.shape),
         "heatmap_shape": list(heatmap_resized.shape),
+        "logits_shape": list(logits_resized.shape),
     }
     (outdir / f"{stem}.json").write_text(json.dumps(meta, ensure_ascii=False, indent=2), encoding="utf-8")
     print(f"鉁?Saved: {outdir / f'{stem}.json'}")

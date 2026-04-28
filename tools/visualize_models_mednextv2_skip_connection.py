@@ -31,12 +31,17 @@ from visualize_nnunetv2_skip_connection import (
     _backward_target_from_logits,
     _unwrap_module,
     default_dataset_directory,
+    default_gt_directory,
     load_case_npz,
+    logits_to_volume,
     make_heatmap,
     pick_middle_slices,
     plot_image_and_target,
+    plot_logits_slice,
     plot_multi_view_overlay,
     plot_single_view_overlay,
+    resolve_target,
+    resize_logits_to_original,
     resize_to_original,
 )
 
@@ -162,7 +167,7 @@ def extract_heatmap(
     backend: str,
     target_layer: str,
     normalize: str,
-) -> Tuple[np.ndarray, str, List[int]]:
+) -> Tuple[np.ndarray, np.ndarray, str, List[int]]:
     net = _unwrap_module(network)
     layer_name, target_module = find_target_layer(net, target_layer)
 
@@ -197,7 +202,8 @@ def extract_heatmap(
             raise RuntimeError(f"Failed to capture gradients from '{layer_name}'")
 
         heatmap = make_heatmap(feat_map, "gradcam", grad=grad, normalize=normalize)
-        return heatmap, layer_name, list(feat_map.shape)
+        logits_volume = logits_to_volume(logits)
+        return heatmap, logits_volume, layer_name, list(feat_map.shape)
 
     captured: Dict[str, torch.Tensor] = {}
 
@@ -210,7 +216,7 @@ def extract_heatmap(
     hook = target_module.register_forward_hook(hook_fn)
     try:
         with torch.no_grad():
-            net(x)
+            logits = net(x)
     finally:
         hook.remove()
 
@@ -219,7 +225,8 @@ def extract_heatmap(
         raise RuntimeError(f"Failed to capture features from '{layer_name}'")
 
     heatmap = make_heatmap(feat_map, "activation", normalize=normalize)
-    return heatmap, layer_name, list(feat_map.shape)
+    logits_volume = logits_to_volume(logits)
+    return heatmap, logits_volume, layer_name, list(feat_map.shape)
 
 
 def save_outputs(
@@ -235,6 +242,7 @@ def save_outputs(
     feature_shape: List[int],
     data: np.ndarray,
     heatmap_resized: np.ndarray,
+    logits_resized: np.ndarray,
 ) -> None:
     outdir.mkdir(parents=True, exist_ok=True)
     slices = pick_middle_slices(
@@ -244,6 +252,11 @@ def save_outputs(
 
     axial_idx = slices["axial"]
     target_slice = None if target is None else target[axial_idx]
+    plot_logits_slice(
+        logits_resized[axial_idx],
+        outdir / f"{stem}_logits.png",
+        f"{case_id} | {checkpoint_name} | {layer_name} | Foreground Logits",
+    )
     plot_image_and_target(
         data[0, 0, axial_idx],
         outdir / f"{stem}_image_target.png",
@@ -285,6 +298,7 @@ def save_outputs(
         ],
         "feature_shape": feature_shape,
         "heatmap_shape": list(heatmap_resized.shape),
+        "logits_shape": list(logits_resized.shape),
     }
     (outdir / f"{stem}.json").write_text(
         json.dumps(meta, ensure_ascii=False, indent=2),
@@ -341,6 +355,11 @@ def main() -> None:
         help="Custom dataset directory",
     )
     parser.add_argument(
+        "--gt-directory",
+        default=None,
+        help="Directory containing GT .nii.gz files",
+    )
+    parser.add_argument(
         "--plans-file",
         default=None,
         help="Custom plans file",
@@ -371,6 +390,7 @@ def main() -> None:
     plans_file = args.plans_file or str(default_plans_path())
     dataset_directory = args.dataset_directory or str(default_dataset_directory(TASK))
     dataset_directory_path = Path(dataset_directory)
+    gt_directory = Path(args.gt_directory) if args.gt_directory else default_gt_directory(TASK)
     case_dir = Path(args.case_dir) if args.case_dir else checkpoint_dir / "validation_raw"
     output_folder = str(CKPT_BASE / f"fold_{args.fold}")
 
@@ -386,6 +406,7 @@ def main() -> None:
     print(f"Checkpoint dir:     {checkpoint_dir}")
     print(f"Requested case dir: {case_dir}")
     print(f"Dataset directory:  {dataset_directory_path}")
+    print(f"GT directory:       {gt_directory}")
     print(f"Output dir:         {args.output_dir}")
     print(f"{'=' * 72}\n")
 
@@ -430,12 +451,18 @@ def main() -> None:
             case_id = case_file.stem
             print(f"[{job_idx}/{total_jobs}] {ckpt_name} -> {case_id}")
 
-            data, target = load_case_npz(case_file, expected_in)
+            data, npz_target = load_case_npz(case_file, expected_in)
+            target = resolve_target(
+                case_file.stem,
+                npz_target,
+                gt_directory,
+                expected_shape=(int(data.shape[2]), int(data.shape[3]), int(data.shape[4])),
+            )
             x = torch.from_numpy(data).float().to(args.device)
             if args.backend == "gradcam":
                 x.requires_grad_(True)
 
-            heatmap, layer_name, feature_shape = extract_heatmap(
+            heatmap, logits_volume, layer_name, feature_shape = extract_heatmap(
                 trainer.network,
                 x,
                 args.backend,
@@ -444,6 +471,7 @@ def main() -> None:
             )
             original_shape = (int(data.shape[2]), int(data.shape[3]), int(data.shape[4]))
             heatmap_resized = resize_to_original(heatmap, original_shape)
+            logits_resized = resize_logits_to_original(logits_volume, original_shape)
 
             outdir = (
                 Path(args.output_dir)
@@ -466,6 +494,7 @@ def main() -> None:
                 feature_shape=feature_shape,
                 data=data,
                 heatmap_resized=heatmap_resized,
+                logits_resized=logits_resized,
             )
 
     if not args.skip_montage:

@@ -41,6 +41,8 @@ from visualize_models_mednextv2_skip_connection import (
     find_epoch_checkpoints,
     load_case_npz,
     load_checkpoint,
+    default_gt_directory,
+    resolve_target,
     save_outputs,
 )
 import importlib
@@ -138,6 +140,11 @@ def main() -> None:
         help="Custom dataset directory",
     )
     parser.add_argument(
+        "--gt-directory",
+        default=None,
+        help="Directory containing GT .nii.gz files",
+    )
+    parser.add_argument(
         "--plans-file",
         default=None,
         help="Custom plans file",
@@ -169,6 +176,7 @@ def main() -> None:
     plans_file = args.plans_file or str(default_plans_path())
     dataset_directory = args.dataset_directory or str(default_dataset_directory(TASK))
     dataset_directory_path = Path(dataset_directory)
+    gt_directory = Path(args.gt_directory) if args.gt_directory else default_gt_directory(TASK)
     case_dir = Path(args.case_dir) if args.case_dir else checkpoint_dir / "validation_raw"
     output_folder = str(CKPT_BASE / f"fold_{args.fold}")
 
@@ -184,6 +192,7 @@ def main() -> None:
     print(f"Checkpoint dir:     {checkpoint_dir}")
     print(f"Requested case dir: {case_dir}")
     print(f"Dataset directory:  {dataset_directory_path}")
+    print(f"GT directory:       {gt_directory}")
     print(f"Output dir:         {args.output_dir}")
     print(f"{'=' * 80}\n")
 
@@ -223,7 +232,13 @@ def main() -> None:
 
         for case_file in case_files:
             case_id = case_file.stem
-            data, target = load_case_npz(case_file, expected_in)
+            data, npz_target = load_case_npz(case_file, expected_in)
+            target = resolve_target(
+                case_file.stem,
+                npz_target,
+                gt_directory,
+                expected_shape=(int(data.shape[2]), int(data.shape[3]), int(data.shape[4])),
+            )
             original_shape = (int(data.shape[2]), int(data.shape[3]), int(data.shape[4]))
             outdir = (
                 Path(args.output_dir)
