@@ -34,6 +34,7 @@ from visualize_nnunetv2_skip_connection import (
     load_case_npz,
     make_heatmap,
     pick_middle_slices,
+    plot_image_and_target,
     plot_multi_view_overlay,
     plot_single_view_overlay,
     resize_to_original,
@@ -227,6 +228,7 @@ def save_outputs(
     case_id: str,
     backend: str,
     normalize: str,
+    target: Optional[np.ndarray],
     checkpoint_path: Path,
     checkpoint_name: str,
     layer_name: str,
@@ -241,11 +243,19 @@ def save_outputs(
     stem = f"{checkpoint_name}_{backend}_{normalize}_{layer_name.replace('.', '_')}"
 
     axial_idx = slices["axial"]
+    target_slice = None if target is None else target[axial_idx]
+    plot_image_and_target(
+        data[0, 0, axial_idx],
+        outdir / f"{stem}_image_target.png",
+        f"{case_id} | {checkpoint_name} | {layer_name} | Image + Target",
+        target_slice,
+    )
     plot_single_view_overlay(
         data[0, 0, axial_idx],
         heatmap_resized[axial_idx],
         outdir / f"{stem}_axial.png",
         f"{case_id} | {checkpoint_name} | {backend} | {layer_name}",
+        target_slice,
     )
 
     plot_multi_view_overlay(
@@ -253,6 +263,7 @@ def save_outputs(
         heatmap_resized,
         outdir / f"{stem}_3views.png",
         f"{case_id} | {checkpoint_name} | {backend} | {layer_name}",
+        target,
     )
 
     meta = {
@@ -419,7 +430,7 @@ def main() -> None:
             case_id = case_file.stem
             print(f"[{job_idx}/{total_jobs}] {ckpt_name} -> {case_id}")
 
-            data, _ = load_case_npz(case_file, expected_in)
+            data, target = load_case_npz(case_file, expected_in)
             x = torch.from_numpy(data).float().to(args.device)
             if args.backend == "gradcam":
                 x.requires_grad_(True)
@@ -448,6 +459,7 @@ def main() -> None:
                 case_id=case_id,
                 backend=args.backend,
                 normalize=args.normalize,
+                target=target,
                 checkpoint_path=checkpoint_path,
                 checkpoint_name=ckpt_name,
                 layer_name=layer_name,

@@ -345,6 +345,21 @@ def get_view_slices(
     return img, hm
 
 
+def get_mask_slice(
+    mask: np.ndarray,
+    axis: str,
+    idx: int,
+) -> np.ndarray:
+    """Extract a 2D slice from a 3D mask volume."""
+    if axis == "axial":
+        return mask[idx]
+    if axis == "coronal":
+        return mask[:, idx, :]
+    if axis == "sagittal":
+        return mask[:, :, idx]
+    raise ValueError(f"Invalid axis: {axis}")
+
+
 def pick_middle_slices(volume_shape: Tuple[int, int, int]) -> Dict[str, int]:
     """Pick middle slice indices for each view."""
     return {
@@ -358,10 +373,12 @@ def plot_single_view_overlay(
     image: np.ndarray,
     heatmap: np.ndarray,
     out_png: Path,
-    title: str
+    title: str,
+    target: Optional[np.ndarray] = None,
 ) -> None:
-    """Plot original image and heatmap-only view for a single slice."""
-    fig, axes = plt.subplots(1, 2, figsize=(12, 5))
+    """Plot original image, heatmap-only view, and optional target mask."""
+    ncols = 3 if target is not None else 2
+    fig, axes = plt.subplots(1, ncols, figsize=(6 * ncols, 5))
     heatmap_kwargs = resolve_heatmap_imshow_kwargs(heatmap)
 
     axes[0].imshow(image, cmap="gray")
@@ -372,6 +389,12 @@ def plot_single_view_overlay(
     axes[1].set_title("Feature Heatmap")
     axes[1].axis("off")
 
+    if target is not None:
+        axes[2].imshow(image, cmap="gray")
+        axes[2].imshow(target, cmap="Reds", vmin=0, vmax=max(1, int(np.max(target))), alpha=0.8)
+        axes[2].set_title("Target Mask")
+        axes[2].axis("off")
+
     fig.suptitle(title, fontsize=12, fontweight="bold")
     plt.tight_layout()
     plt.savefig(out_png, dpi=300, bbox_inches="tight")
@@ -379,17 +402,46 @@ def plot_single_view_overlay(
     print(f"鉁?Saved single-view overlay: {out_png}")
 
 
+def plot_image_and_target(
+    image: np.ndarray,
+    out_png: Path,
+    title: str,
+    target: Optional[np.ndarray] = None,
+) -> None:
+    """Plot original image and optional target mask in a standalone figure."""
+    ncols = 2 if target is not None else 1
+    fig, axes = plt.subplots(1, ncols, figsize=(6 * ncols, 5))
+    axes_list = axes if isinstance(axes, np.ndarray) else np.array([axes])
+
+    axes_list[0].imshow(image, cmap="gray")
+    axes_list[0].set_title("CT Image")
+    axes_list[0].axis("off")
+
+    if target is not None:
+        axes_list[1].imshow(image, cmap="gray")
+        axes_list[1].imshow(target, cmap="Reds", vmin=0, vmax=max(1, int(np.max(target))), alpha=0.8)
+        axes_list[1].set_title("Target Mask")
+        axes_list[1].axis("off")
+
+    fig.suptitle(title, fontsize=12, fontweight="bold")
+    plt.tight_layout()
+    plt.savefig(out_png, dpi=300, bbox_inches="tight")
+    plt.close(fig)
+    print(f"Saved image/target figure: {out_png}")
+
+
 def plot_multi_view_overlay(
     data: np.ndarray,
     heatmap: np.ndarray,
     out_png: Path,
-    title: str
+    title: str,
+    target: Optional[np.ndarray] = None,
 ) -> None:
-    """Plot three-view image/heatmap pairs (axial, coronal, sagittal)."""
+    """Plot three-view image/heatmap pairs and optional target masks."""
     volume_shape = (int(data.shape[2]), int(data.shape[3]), int(data.shape[4]))
     slices = pick_middle_slices(volume_shape)
-
-    fig, axes = plt.subplots(3, 2, figsize=(12, 14))
+    ncols = 3 if target is not None else 2
+    fig, axes = plt.subplots(3, ncols, figsize=(6 * ncols, 14))
 
     for row, axis in enumerate(("axial", "coronal", "sagittal")):
         idx = slices[axis]
@@ -407,6 +459,14 @@ def plot_multi_view_overlay(
         ax.imshow(hm, **heatmap_kwargs)
         ax.set_title(f"{axis.title()} Feature Heatmap (slice {idx})")
         ax.axis("off")
+
+        if target is not None:
+            mask_slice = get_mask_slice(target, axis, idx)
+            ax = axes[row, 2]
+            ax.imshow(img, cmap="gray")
+            ax.imshow(mask_slice, cmap="Reds", vmin=0, vmax=max(1, int(np.max(target))), alpha=0.8)
+            ax.set_title(f"{axis.title()} Target Mask (slice {idx})")
+            ax.axis("off")
 
     fig.suptitle(title, fontsize=14, fontweight="bold")
     plt.tight_layout()
@@ -594,17 +654,26 @@ def main() -> None:
     axial_idx = slices["axial"]
     image_slice = data[0, 0, axial_idx]
     heat_slice = heatmap_resized[axial_idx]
+    target_slice = None if target is None else target[axial_idx]
+    plot_image_and_target(
+        image_slice,
+        outdir / f"{stem}_image_target.png",
+        f"{TASK} | {TRAINER_NAME} | {case_file.stem} | Axial Image + Target",
+        target_slice,
+    )
     plot_single_view_overlay(
         image_slice, heat_slice,
         outdir / f"{stem}_axial.png",
-        f"{TASK} | {TRAINER_NAME} | {case_file.stem} | First Skip Connection | Axial View"
+        f"{TASK} | {TRAINER_NAME} | {case_file.stem} | First Skip Connection | Axial View",
+        target_slice,
     )
 
     # Save multi-view overlay
     plot_multi_view_overlay(
         data, heatmap_resized,
         outdir / f"{stem}_3views.png",
-        f"{TASK} | {TRAINER_NAME} | {case_file.stem} | First Skip Connection | Multi-View"
+        f"{TASK} | {TRAINER_NAME} | {case_file.stem} | First Skip Connection | Multi-View",
+        target,
     )
 
     # Save metadata

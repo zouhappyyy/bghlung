@@ -223,7 +223,7 @@ def main() -> None:
 
         for case_file in case_files:
             case_id = case_file.stem
-            data, _ = load_case_npz(case_file, expected_in)
+            data, target = load_case_npz(case_file, expected_in)
             original_shape = (int(data.shape[2]), int(data.shape[3]), int(data.shape[4]))
             outdir = (
                 Path(args.output_dir)
@@ -257,6 +257,7 @@ def main() -> None:
                     case_id=case_id,
                     backend=args.backend,
                     normalize=args.normalize,
+                    target=target,
                     checkpoint_path=checkpoint_path,
                     checkpoint_name=ckpt_name,
                     layer_name=resolved_layer_name,
