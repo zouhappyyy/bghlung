@@ -382,10 +382,16 @@ def plot_mean_spectrum_slices(layer_summaries: Dict[str, Dict[str, object]], out
     for col, layer_name in enumerate(LAYER_ORDER):
         mean_spectrum = layer_summaries[layer_name]["mean_resized_spectrum"]
         slices = central_slices(mean_spectrum)
+        high_ratio = float(layer_summaries[layer_name]["band_energy_ratio_mean"]["high"])
         for row, axis_name in enumerate(("axial", "coronal", "sagittal")):
             ax = axes[row, col]
             ax.imshow(slices[axis_name], cmap="magma", interpolation="nearest")
-            ax.set_title(f"{LAYER_TITLES[layer_name]} | {axis_name}")
+            if row == 0:
+                ax.set_title(
+                    f"{LAYER_TITLES[layer_name]}\n{axis_name} | High={high_ratio:.4f} ({high_ratio * 100:.2f}%)"
+                )
+            else:
+                ax.set_title(f"{axis_name} | High={high_ratio:.4f} ({high_ratio * 100:.2f}%)")
             ax.axis("off")
     fig.suptitle("Mean Log-Spectrum Slices", fontsize=14, fontweight="bold")
     plt.tight_layout()
@@ -398,7 +404,13 @@ def plot_radial_profiles(layer_summaries: Dict[str, Dict[str, object]], output_p
     radius = np.linspace(0.0, 1.0, len(next(iter(layer_summaries.values()))["mean_radial_profile"]))
     for layer_name in LAYER_ORDER:
         profile = np.asarray(layer_summaries[layer_name]["mean_radial_profile"], dtype=np.float32)
-        ax.plot(radius, profile, linewidth=2.0, label=LAYER_TITLES[layer_name])
+        high_ratio = float(layer_summaries[layer_name]["band_energy_ratio_mean"]["high"])
+        ax.plot(
+            radius,
+            profile,
+            linewidth=2.0,
+            label=f"{LAYER_TITLES[layer_name]} | High={high_ratio:.4f} ({high_ratio * 100:.2f}%)",
+        )
     ax.set_xlabel("Normalized Radius")
     ax.set_ylabel("Mean Normalized Spectral Energy")
     ax.set_title("Radial Frequency Profiles")
@@ -418,7 +430,16 @@ def plot_band_energy_ratios(layer_summaries: Dict[str, Dict[str, object]], outpu
     for idx, layer_name in enumerate(LAYER_ORDER):
         ratios = layer_summaries[layer_name]["band_energy_ratio_mean"]
         values = [ratios[label] for label in labels]
-        ax.bar(x + idx * width - width, values, width=width, label=LAYER_TITLES[layer_name])
+        bars = ax.bar(x + idx * width - width, values, width=width, label=LAYER_TITLES[layer_name])
+        for bar, value in zip(bars, values):
+            ax.text(
+                bar.get_x() + bar.get_width() / 2.0,
+                bar.get_height() + 0.01,
+                f"{value:.4f}\n({value * 100:.2f}%)",
+                ha="center",
+                va="bottom",
+                fontsize=9,
+            )
 
     ax.set_xticks(x)
     ax.set_xticklabels([label.title() for label in labels])
@@ -469,6 +490,15 @@ def write_radial_profiles_csv(layer_summaries: Dict[str, Dict[str, object]], out
                     ],
                 ]
             )
+
+
+def write_high_frequency_summary_csv(layer_summaries: Dict[str, Dict[str, object]], output_path: Path) -> None:
+    with output_path.open("w", newline="", encoding="utf-8") as handle:
+        writer = csv.writer(handle)
+        writer.writerow(["layer", "high_freq_ratio", "high_freq_percent"])
+        for layer_name in LAYER_ORDER:
+            high_ratio = float(layer_summaries[layer_name]["band_energy_ratio_mean"]["high"])
+            writer.writerow([layer_name, f"{high_ratio:.10f}", f"{high_ratio * 100:.4f}"])
 
 
 def print_run_header(args: argparse.Namespace, checkpoint_path: Path, case_files: Iterable[Path]) -> None:
@@ -579,6 +609,7 @@ def main() -> None:
 
     write_case_metrics_csv(case_metric_rows, output_dir / "case_metrics.csv")
     write_radial_profiles_csv(layer_summaries, output_dir / "radial_profiles.csv")
+    write_high_frequency_summary_csv(layer_summaries, output_dir / "high_frequency_summary.csv")
     plot_mean_spectrum_slices(layer_summaries, output_dir / "mean_spectrum_slices.png")
     plot_radial_profiles(layer_summaries, output_dir / "radial_profiles.png")
     plot_band_energy_ratios(layer_summaries, output_dir / "band_energy_ratios.png")
@@ -586,11 +617,17 @@ def main() -> None:
     with (output_dir / "summary.json").open("w", encoding="utf-8") as handle:
         json.dump(summary_json, handle, indent=2, ensure_ascii=False)
 
+    print("\nHigh-frequency ratios:")
+    for layer_name in LAYER_ORDER:
+        high_ratio = float(layer_summaries[layer_name]["band_energy_ratio_mean"]["high"])
+        print(f"  - {LAYER_TITLES[layer_name]}: {high_ratio:.6f} ({high_ratio * 100:.2f}%)")
+
     print("\nSaved outputs:")
     for name in (
         "summary.json",
         "case_metrics.csv",
         "radial_profiles.csv",
+        "high_frequency_summary.csv",
         "mean_spectrum_slices.png",
         "radial_profiles.png",
         "band_energy_ratios.png",
