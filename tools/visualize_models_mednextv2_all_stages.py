@@ -47,7 +47,7 @@ from visualize_models_mednextv2_skip_connection import (
 )
 import importlib
 
-from visualize_nnunetv2_skip_connection import resize_to_original
+from visualize_nnunetv2_skip_connection import resize_logits_to_original, resize_to_original
 
 
 CORE_STAGE_LAYERS = [
@@ -258,7 +258,7 @@ def main() -> None:
                 if args.backend == "gradcam":
                     x.requires_grad_(True)
 
-                heatmap, resolved_layer_name, feature_shape = extract_heatmap(
+                heatmap, logits_volume, resolved_layer_name, feature_shape = extract_heatmap(
                     trainer.network,
                     x,
                     args.backend,
@@ -266,6 +266,7 @@ def main() -> None:
                     args.normalize,
                 )
                 heatmap_resized = resize_to_original(heatmap, original_shape)
+                logits_resized = resize_logits_to_original(logits_volume, original_shape)
 
                 save_outputs(
                     outdir=outdir,
@@ -279,6 +280,7 @@ def main() -> None:
                     feature_shape=feature_shape,
                     data=data,
                     heatmap_resized=heatmap_resized,
+                    logits_resized=logits_resized,
                 )
 
     if not args.skip_montage:
