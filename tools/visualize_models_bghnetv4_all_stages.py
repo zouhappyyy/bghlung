@@ -133,7 +133,10 @@ def crop_or_pad_to_patch(
     target: Optional[np.ndarray],
     patch_size: Tuple[int, int, int],
 ) -> Tuple[np.ndarray, Optional[np.ndarray], Dict[str, List[int]]]:
-    spatial_shape = tuple(int(i) for i in data.shape[1:])
+    if data.ndim != 5:
+        raise RuntimeError(f"Expected data to be 5D (B, C, D, H, W), got {data.shape}")
+
+    spatial_shape = tuple(int(i) for i in data.shape[2:])
 
     if target is not None and np.any(target > 0):
         fg = np.argwhere(target > 0)
@@ -148,12 +151,12 @@ def crop_or_pad_to_patch(
         slices.append(slice(start, end))
         crop_bbox.append([int(start), int(end)])
 
-    cropped_data = data[:, slices[0], slices[1], slices[2]]
+    cropped_data = data[:, :, slices[0], slices[1], slices[2]]
     cropped_target = None if target is None else target[slices[0], slices[1], slices[2]]
 
-    pad_width_data = [(0, 0)]
+    pad_width_data = [(0, 0), (0, 0)]
     pad_width_target = []
-    final_shape = tuple(int(i) for i in cropped_data.shape[1:])
+    final_shape = tuple(int(i) for i in cropped_data.shape[2:])
     for size, current in zip(patch_size, final_shape):
         total_pad = max(0, size - current)
         before = total_pad // 2
