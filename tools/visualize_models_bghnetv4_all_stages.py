@@ -80,7 +80,12 @@ def discover_stage_specs(network: torch.nn.Module, stage_mode: str) -> List[Tupl
     num_pool = network.num_pool
 
     for idx, layer in enumerate(network.down_layers):
-        specs.append((f"encoder_stage{idx}", layer.conv_blocks, _selector_first))
+        encoder_module = getattr(layer, "conv_blocks", None)
+        if encoder_module is None:
+            encoder_module = getattr(layer, "convnext_blocks", None)
+        if encoder_module is None:
+            raise RuntimeError(f"Could not find encoder feature module for down_layers[{idx}]")
+        specs.append((f"encoder_stage{idx}", encoder_module, _selector_first))
         if stage_mode == "all" and layer.down_or_upsample is not None:
             specs.append((f"downsample_stage{idx}", layer.down_or_upsample, _selector_first))
 
