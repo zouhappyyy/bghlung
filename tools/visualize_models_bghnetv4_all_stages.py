@@ -53,6 +53,7 @@ CKPT_BASE = (
     / f"{TRAINER_NAME}__nnUNetPlansv2.1"
 )
 NETWORK = "3d_fullres"
+PATCH_SIZE = (80, 80, 80)
 
 
 def default_plans_path() -> Path:
@@ -111,6 +112,70 @@ def discover_stage_specs(network: torch.nn.Module, stage_mode: str) -> List[Tupl
             specs.append((f"bdr_output_stage{stage_id}", bdr_layer.deep_supervision, _selector_first))
 
     return specs
+
+
+def _compute_crop_bounds(center: int, size: int, limit: int) -> Tuple[int, int]:
+    start = center - size // 2
+    end = start + size
+    if start < 0:
+        end -= start
+        start = 0
+    if end > limit:
+        start -= end - limit
+        end = limit
+    start = max(0, start)
+    end = min(limit, end)
+    return start, end
+
+
+def crop_or_pad_to_patch(
+    data: np.ndarray,
+    target: Optional[np.ndarray],
+    patch_size: Tuple[int, int, int],
+) -> Tuple[np.ndarray, Optional[np.ndarray], Dict[str, List[int]]]:
+    spatial_shape = tuple(int(i) for i in data.shape[1:])
+
+    if target is not None and np.any(target > 0):
+        fg = np.argwhere(target > 0)
+        center = [int(round((fg[:, i].min() + fg[:, i].max()) / 2.0)) for i in range(3)]
+    else:
+        center = [s // 2 for s in spatial_shape]
+
+    slices = []
+    crop_bbox = []
+    for c, size, limit in zip(center, patch_size, spatial_shape):
+        start, end = _compute_crop_bounds(c, size, limit)
+        slices.append(slice(start, end))
+        crop_bbox.append([int(start), int(end)])
+
+    cropped_data = data[:, slices[0], slices[1], slices[2]]
+    cropped_target = None if target is None else target[slices[0], slices[1], slices[2]]
+
+    pad_width_data = [(0, 0)]
+    pad_width_target = []
+    final_shape = tuple(int(i) for i in cropped_data.shape[1:])
+    for size, current in zip(patch_size, final_shape):
+        total_pad = max(0, size - current)
+        before = total_pad // 2
+        after = total_pad - before
+        pad_width_data.append((before, after))
+        pad_width_target.append((before, after))
+
+    if any(pad != (0, 0) for pad in pad_width_data[1:]):
+        cropped_data = np.pad(cropped_data, pad_width_data, mode="constant", constant_values=0)
+        if cropped_target is not None:
+            cropped_target = np.pad(cropped_target, pad_width_target, mode="constant", constant_values=0)
+
+    crop_info = {
+        "original_shape": list(spatial_shape),
+        "patch_size": list(patch_size),
+        "crop_bbox_zyx": crop_bbox,
+        "crop_center_zyx": [int(i) for i in center],
+        "cropped_shape_before_pad": list(final_shape),
+        "pad_width_zyx": [[int(a), int(b)] for a, b in pad_width_target],
+        "final_patch_shape": list(cropped_data.shape[1:]),
+    }
+    return cropped_data, cropped_target, crop_info
 
 
 def parse_stage_specs(
@@ -378,6 +443,8 @@ def main() -> None:
             data, npz_target = load_case_npz(case_file, expected_in)
             original_shape = (int(data.shape[2]), int(data.shape[3]), int(data.shape[4]))
             target = resolve_target(case_id, npz_target, gt_directory, expected_shape=original_shape)
+            data, target, crop_info = crop_or_pad_to_patch(data, target, PATCH_SIZE)
+            model_input_shape = (int(data.shape[2]), int(data.shape[3]), int(data.shape[4]))
 
             outdir = (
                 Path(args.output_dir)
@@ -406,8 +473,8 @@ def main() -> None:
                     selector,
                     args.normalize,
                 )
-                heatmap_resized = resize_to_original(heatmap, original_shape)
-                logits_resized = resize_logits_to_original(logits_volume, original_shape)
+                heatmap_resized = resize_to_original(heatmap, model_input_shape)
+                logits_resized = resize_logits_to_original(logits_volume, model_input_shape)
 
                 save_outputs(
                     outdir=outdir,
