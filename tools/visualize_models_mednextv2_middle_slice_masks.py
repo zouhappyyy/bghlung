@@ -1,10 +1,15 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""Run one case through all MedNeXt checkpoints and save middle-slice masks.
+"""Run one case through all MedNeXt checkpoints and save 3-view error masks.
 
-This script loads a single preprocessed `.npz` case, runs inference with every
-saved MedNeXtTrainerV2 checkpoint, and exports the middle axial slice of the
-predicted segmentation as an RGB mask image.
+For one preprocessed `.npz` case, this script runs inference with every saved
+MedNeXtTrainerV2 checkpoint and exports axial/coronal/sagittal middle slices.
+The visualization uses RGB error coding:
+
+- green: correctly predicted foreground (true positive)
+- red: false positive
+- blue: false negative
+- black: background / true negative
 """
 
 from __future__ import annotations
@@ -13,9 +18,8 @@ import argparse
 import importlib
 import math
 from pathlib import Path
-from typing import List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple
 
-import matplotlib.colors as mcolors
 import matplotlib.pyplot as plt
 import numpy as np
 import torch
@@ -28,27 +32,13 @@ from visualize_models_mednextv2_skip_connection import (
     checkpoint_tag,
     choose_case_files,
     default_dataset_directory,
+    default_gt_directory,
     default_plans_path,
     find_epoch_checkpoints,
     load_case_npz,
     load_checkpoint,
 )
-
-
-RGB_MASK_COLORS = [
-    "#000000",  # background
-    "#ff0000",  # class 1: red
-    "#00ff00",  # class 2: green
-    "#0000ff",  # class 3: blue
-]
-
-
-def get_mask_cmap(num_classes: int) -> mcolors.ListedColormap:
-    colors = list(RGB_MASK_COLORS)
-    if num_classes > len(colors):
-        extra = plt.cm.tab10(np.linspace(0, 1, num_classes - len(colors)))
-        colors.extend(extra)
-    return mcolors.ListedColormap(colors[:num_classes])
+from visualize_nnunetv2_skip_connection import get_mask_slice, resolve_target
 
 
 def extract_prediction_mask(network: torch.nn.Module, x: torch.Tensor) -> np.ndarray:
@@ -58,34 +48,59 @@ def extract_prediction_mask(network: torch.nn.Module, x: torch.Tensor) -> np.nda
         logits = logits[0]
     if logits.dim() != 5:
         raise RuntimeError(f"Expected 5D logits tensor, got {tuple(logits.shape)}")
-
     pred = torch.argmax(logits, dim=1)
     return pred[0].detach().cpu().numpy().astype(np.uint8)
 
 
-def save_middle_slice_mask(
+def choose_slice_indices(target: Optional[np.ndarray], volume_shape: Tuple[int, int, int]) -> Dict[str, int]:
+    if target is not None and np.any(target > 0):
+        fg = np.argwhere(target > 0)
+        return {
+            "axial": int(round((fg[:, 0].min() + fg[:, 0].max()) / 2.0)),
+            "coronal": int(round((fg[:, 1].min() + fg[:, 1].max()) / 2.0)),
+            "sagittal": int(round((fg[:, 2].min() + fg[:, 2].max()) / 2.0)),
+        }
+
+    return {
+        "axial": volume_shape[0] // 2,
+        "coronal": volume_shape[1] // 2,
+        "sagittal": volume_shape[2] // 2,
+    }
+
+
+def make_error_rgb(pred_slice: np.ndarray, gt_slice: np.ndarray) -> np.ndarray:
+    pred_fg = pred_slice > 0
+    gt_fg = gt_slice > 0
+
+    rgb = np.zeros(pred_slice.shape + (3,), dtype=np.float32)
+    rgb[np.logical_and(pred_fg, gt_fg)] = (0.0, 1.0, 0.0)  # TP green
+    rgb[np.logical_and(pred_fg, np.logical_not(gt_fg))] = (1.0, 0.0, 0.0)  # FP red
+    rgb[np.logical_and(np.logical_not(pred_fg), gt_fg)] = (0.0, 0.0, 1.0)  # FN blue
+    return rgb
+
+
+def save_three_view_error_masks(
     pred_mask: np.ndarray,
+    target: np.ndarray,
     out_png: Path,
     title: str,
-    num_classes: int,
-) -> int:
-    axial_idx = pred_mask.shape[0] // 2
-    mask_slice = pred_mask[axial_idx]
+    slice_indices: Dict[str, int],
+) -> None:
+    fig, axes = plt.subplots(1, 3, figsize=(15, 5))
 
-    fig, ax = plt.subplots(1, 1, figsize=(6, 6))
-    ax.imshow(
-        mask_slice,
-        cmap=get_mask_cmap(max(num_classes, int(mask_slice.max()) + 1)),
-        interpolation="nearest",
-        vmin=0,
-        vmax=max(num_classes - 1, int(mask_slice.max())),
-    )
-    ax.set_title(title)
-    ax.axis("off")
+    for ax, axis in zip(axes, ("axial", "coronal", "sagittal")):
+        idx = slice_indices[axis]
+        pred_slice = get_mask_slice(pred_mask, axis, idx)
+        gt_slice = get_mask_slice(target, axis, idx)
+        rgb = make_error_rgb(pred_slice, gt_slice)
+        ax.imshow(rgb, interpolation="nearest")
+        ax.set_title(f"{axis.title()} ({idx})")
+        ax.axis("off")
+
+    fig.suptitle(title, fontsize=14, fontweight="bold")
     plt.tight_layout()
     plt.savefig(out_png, dpi=300, bbox_inches="tight")
     plt.close(fig)
-    return axial_idx
 
 
 def save_mask_montage(
@@ -99,7 +114,7 @@ def save_mask_montage(
 
     ncols = max(1, ncols)
     nrows = math.ceil(len(image_pairs) / ncols)
-    fig, axes = plt.subplots(nrows, ncols, figsize=(ncols * 4.5, nrows * 4.5))
+    fig, axes = plt.subplots(nrows, ncols, figsize=(ncols * 5.0, nrows * 5.0))
     axes_list = axes.flatten().tolist() if hasattr(axes, "flatten") else [axes]
 
     for ax, (label, image_path) in zip(axes_list, image_pairs):
@@ -119,7 +134,7 @@ def save_mask_montage(
 
 def main() -> None:
     parser = argparse.ArgumentParser(
-        description="Run one case through all MedNeXt checkpoints and save middle-slice RGB masks",
+        description="Run one case through all MedNeXt checkpoints and save RGB 3-view error masks",
     )
     parser.add_argument("--fold", type=int, default=2, help="Fold number")
     parser.add_argument(
@@ -128,6 +143,11 @@ def main() -> None:
         help="Directory containing input .npz files",
     )
     parser.add_argument("--case-id", default=None, help="Specific case ID; defaults to the first case")
+    parser.add_argument(
+        "--gt-directory",
+        default="/home/fangzheng/zoule/ESO_nnUNet_dataset/nnUNet_preprocessed/Task530_EsoTJ_30pct/gt_segmentations",
+        help="Directory containing GT .nii.gz files",
+    )
     parser.add_argument(
         "--checkpoint-dir",
         default=None,
@@ -162,12 +182,13 @@ def main() -> None:
 
     checkpoint_dir = Path(args.checkpoint_dir) if args.checkpoint_dir else CKPT_BASE / f"fold_{args.fold}"
     case_dir = Path(args.case_dir)
+    gt_directory = Path(args.gt_directory) if args.gt_directory else default_gt_directory(TASK)
     plans_file = args.plans_file or str(default_plans_path())
     dataset_directory = args.dataset_directory or str(default_dataset_directory(TASK))
     output_folder = str(CKPT_BASE / f"fold_{args.fold}")
 
     print(f"\n{'=' * 72}")
-    print("MedNeXt Middle Slice Segmentation Masks")
+    print("MedNeXt Three-View RGB Error Masks")
     print(f"{'=' * 72}")
     print(f"Task:               {TASK}")
     print(f"Trainer:            {TRAINER_NAME}")
@@ -175,6 +196,7 @@ def main() -> None:
     print(f"Device:             {args.device}")
     print(f"Checkpoint dir:     {checkpoint_dir}")
     print(f"Case dir:           {case_dir}")
+    print(f"GT dir:             {gt_directory}")
     print(f"Output dir:         {args.output_dir}")
     print(f"{'=' * 72}\n")
 
@@ -195,18 +217,28 @@ def main() -> None:
     case_file = case_files[0]
     case_id = case_file.stem
     expected_in = getattr(trainer.network, "num_input_channels", None) or 1
-    data, _ = load_case_npz(case_file, expected_in)
+    data, npz_target = load_case_npz(case_file, expected_in)
+    target = resolve_target(
+        case_id,
+        npz_target,
+        gt_directory,
+        expected_shape=(int(data.shape[2]), int(data.shape[3]), int(data.shape[4])),
+    )
+    if target is None:
+        raise RuntimeError("GT target is required for RGB error-mask visualization but was not found.")
+
     x = torch.from_numpy(data).float().to(args.device)
+    slice_indices = choose_slice_indices(target, (int(data.shape[2]), int(data.shape[3]), int(data.shape[4])))
 
     print(f"Resolved case dir:  {resolved_case_dir}")
     print(f"Selected case:      {case_id}")
+    print(f"Slice indices:      {slice_indices}")
     print(f"Found {len(checkpoints)} checkpoints\n")
 
     outdir = Path(args.output_dir) / TASK / TRAINER_NAME / f"fold_{args.fold}" / case_id
     outdir.mkdir(parents=True, exist_ok=True)
 
     montage_pairs: List[Tuple[str, Path]] = []
-    num_classes = getattr(trainer.network, "num_classes", 2)
 
     for idx, checkpoint_path in enumerate(checkpoints, start=1):
         ckpt_name = checkpoint_tag(checkpoint_path)
@@ -214,20 +246,21 @@ def main() -> None:
         load_checkpoint(trainer, checkpoint_path)
         pred_mask = extract_prediction_mask(trainer.network, x)
 
-        out_png = outdir / f"{ckpt_name}_middle_mask.png"
-        axial_idx = save_middle_slice_mask(
+        out_png = outdir / f"{ckpt_name}_3views_error_mask.png"
+        save_three_view_error_masks(
             pred_mask,
+            target,
             out_png,
-            title=f"{case_id} | {ckpt_name} | axial",
-            num_classes=num_classes,
+            title=f"{case_id} | {ckpt_name} | TP green / FP red / FN blue",
+            slice_indices=slice_indices,
         )
         montage_pairs.append((ckpt_name, out_png))
 
-    montage_png = outdir / "all_models_middle_mask_montage.png"
+    montage_png = outdir / "all_models_3views_error_mask_montage.png"
     save_mask_montage(
         montage_pairs,
         montage_png,
-        title=f"{case_id} | MedNeXtTrainerV2 | axial slice {axial_idx}",
+        title=f"{case_id} | MedNeXtTrainerV2 | TP green / FP red / FN blue",
         ncols=4,
     )
 
