@@ -151,6 +151,9 @@ def load_target_from_gt_dir(
     target = np.asarray(nib.load(str(gt_path)).get_fdata(), dtype=np.int64)
     if target.ndim != 3:
         raise RuntimeError(f"Expected GT to be 3D, got {target.shape} from {gt_path}")
+    # External GT nifti is read as (X, Y, Z), while the preprocessed nnUNet
+    # arrays used by these visualization scripts are indexed as (Z, Y, X).
+    target = np.transpose(target, (2, 1, 0))
     if expected_shape is not None and tuple(target.shape) != tuple(expected_shape):
         raise RuntimeError(
             f"GT shape mismatch for {case_id}: got {target.shape}, expected {expected_shape} from data volume"
