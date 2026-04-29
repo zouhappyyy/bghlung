@@ -106,6 +106,12 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument("--fold", type=int, default=None, help="Fold index used by the trainer fallback path.")
     parser.add_argument("--case-id", default=None, help="Analyze a single case id only.")
+    parser.add_argument(
+        "--case-ids",
+        nargs="+",
+        default=None,
+        help="Analyze multiple specific case ids in one run.",
+    )
     parser.add_argument("--max-cases", type=int, default=None, help="Limit the number of analyzed cases.")
     parser.add_argument("--num-bins", type=int, default=96, help="Number of radial frequency bins.")
     parser.add_argument(
@@ -149,12 +155,29 @@ def infer_fold_from_dir(fold_dir: Path, fallback: int = 0) -> int:
     return fallback
 
 
-def find_case_files(data_dir: Path, case_id: Optional[str], max_cases: Optional[int]) -> List[Path]:
+def find_case_files(
+    data_dir: Path,
+    case_id: Optional[str],
+    case_ids: Optional[Sequence[str]],
+    max_cases: Optional[int],
+) -> List[Path]:
     if not data_dir.is_dir():
         raise FileNotFoundError(f"Data directory not found: {data_dir}")
 
     files = sorted(data_dir.rglob("*.npz"))
-    if case_id is not None:
+    if case_id is not None and case_ids is not None:
+        raise ValueError("Use either --case-id or --case-ids, not both.")
+
+    if case_ids is not None:
+        requested = set(case_ids)
+        files = [path for path in files if path.stem in requested]
+        found = {path.stem for path in files}
+        missing = [cid for cid in case_ids if cid not in found]
+        if missing:
+            raise FileNotFoundError(f"Cases not found under {data_dir}: {missing}")
+        order = {cid: idx for idx, cid in enumerate(case_ids)}
+        files = sorted(files, key=lambda path: order[path.stem])
+    elif case_id is not None:
         files = [path for path in files if path.stem == case_id]
         if not files:
             raise FileNotFoundError(f"Case '{case_id}' not found under {data_dir}")
@@ -603,7 +626,7 @@ def main() -> None:
     if not checkpoint_path.is_file():
         raise FileNotFoundError(f"Checkpoint not found: {checkpoint_path}")
 
-    case_files = find_case_files(data_dir, args.case_id, args.max_cases)
+    case_files = find_case_files(data_dir, args.case_id, args.case_ids, args.max_cases)
     print_run_header(args, checkpoint_path, case_files)
 
     trainer = restore_trainer(
